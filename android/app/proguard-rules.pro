@@ -1,0 +1,3 @@
+-keep class com.vt.teyit.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**

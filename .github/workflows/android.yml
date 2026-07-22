@@ -1,0 +1,61 @@
+name: APK Build
+
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+    inputs:
+      workerUrl:
+        description: 'Worker URL (boşsa repo variable WORKER_URL kullanılır)'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle kur
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Worker URL belirle
+        id: cfg
+        run: |
+          URL="${{ github.event.inputs.workerUrl }}"
+          if [ -z "$URL" ]; then URL="${{ vars.WORKER_URL }}"; fi
+          if [ -z "$URL" ]; then URL="https://teyit-asistani.workers.dev"; fi
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Kullanılan Worker: $URL"
+
+      - name: APK derle
+        working-directory: android
+        run: gradle assembleRelease -PworkerUrl=${{ steps.cfg.outputs.url }} --no-daemon
+
+      - name: Yeniden adlandır
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/release/*.apk out/teyit-${{ github.run_number }}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: teyit-apk
+          path: out/*.apk
+
+      - name: Release yayınla
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: Teyit v0.1.${{ github.run_number }}
+          body: |
+            Telefondan indirip kur (Ayarlar → bilinmeyen kaynaklara izin ver).
+            Worker: ${{ steps.cfg.outputs.url }}
+          files: out/*.apk

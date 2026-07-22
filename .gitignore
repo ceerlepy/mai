@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+.dev.vars
+.gradle/
+build/
+local.properties
+.idea/
+*.apk
+.DS_Store

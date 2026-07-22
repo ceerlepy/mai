@@ -1,0 +1,17 @@
+name = "teyit-asistani"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+workers_dev = true
+
+[ai]
+binding = "AI"
+
+# KV cache — opsiyonel ama tavsiye edilir (tekrarlanan sorularda ~20ms cevap).
+# Oluştur:  npx wrangler kv namespace create CACHE
+# Çıkan id'yi aşağıya yapıştır ve satırların başındaki # işaretlerini kaldır.
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "BURAYA_KV_ID"
+
+[observability]
+enabled = true
