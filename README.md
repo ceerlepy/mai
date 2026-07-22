@@ -1,4 +1,4 @@
-# Teyit
+# MAI
 
 Canlı yayında sunucunun **tereddüt ettiği anı** yakalar, ekrana tek satır net cevap basar.
 
