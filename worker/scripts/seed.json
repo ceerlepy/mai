@@ -1,0 +1,39 @@
+{
+  "items": [
+    {
+      "id": "tuik-enflasyon",
+      "title": "Yıllık tüketici enflasyonu (TÜFE)",
+      "text": "GÜNCELLE: TÜİK'in açıkladığı son yıllık TÜFE oranını ve ait olduğu ayı buraya yaz. Örn: 'Haziran 2026 itibarıyla yıllık TÜFE yüzde XX,X.'",
+      "source": "https://data.tuik.gov.tr",
+      "updated": "2026-07-01"
+    },
+    {
+      "id": "asgari-ucret",
+      "title": "Asgari ücret",
+      "text": "GÜNCELLE: Yürürlükteki net ve brüt asgari ücreti ve geçerli olduğu dönemi yaz.",
+      "source": "https://www.csgb.gov.tr",
+      "updated": "2026-07-01"
+    },
+    {
+      "id": "nufus",
+      "title": "Türkiye nüfusu",
+      "text": "GÜNCELLE: TÜİK ADNKS son nüfus sayısını ve yılını yaz.",
+      "source": "https://data.tuik.gov.tr",
+      "updated": "2026-07-01"
+    },
+    {
+      "id": "politika-faizi",
+      "title": "TCMB politika faizi",
+      "text": "GÜNCELLE: Merkez Bankası'nın yürürlükteki politika faiz oranını ve karar tarihini yaz.",
+      "source": "https://www.tcmb.gov.tr",
+      "updated": "2026-07-01"
+    },
+    {
+      "id": "issizlik",
+      "title": "İşsizlik oranı",
+      "text": "GÜNCELLE: TÜİK'in açıkladığı son işsizlik oranını, ayını ve mevsim düzeltmesi durumunu yaz.",
+      "source": "https://data.tuik.gov.tr",
+      "updated": "2026-07-01"
+    }
+  ]
+}

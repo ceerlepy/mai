@@ -9,7 +9,8 @@ import java.util.concurrent.TimeUnit
 
 data class Answer(
     val text: String,
-    val src: String,      // model | web | cache | none
+    val src: String,          // model | web | yerel | cache | öznel | yok
+    val cls: String = "",     // fresh | semi | static | subj
     val ms: Long,
     val final: Boolean,
     val refs: List<String> = emptyList()
@@ -125,6 +126,7 @@ class CheckClient(private val base: String) {
                     Answer(
                         text = j.optString("text"),
                         src = j.optString("src"),
+                        cls = j.optString("cls"),
                         ms = j.optLong("ms"),
                         final = j.optBoolean("final", true),
                         refs = refs

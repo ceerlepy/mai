@@ -29,6 +29,7 @@ object T {
 
     val Accent    = Color(0xFF4ADE80)   // hazır / model
     val Live      = Color(0xFFF43F5E)   // kayıtta
+    val Wave      = Color(0xFF818CF8)   // tereddüt yakalandı, cevap aranıyor
     val Warn      = Color(0xFFFBBF24)   // emin değilim
     val Web       = Color(0xFF60A5FA)   // web kaynaklı
 }

@@ -11,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,7 +52,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         store = Store(this)
-        client = CheckClient(BuildConfig.WORKER_URL.trimEnd('/'))
+        val endpoint = BuildConfig.WORKER_URL.trimEnd('/')
+        client = CheckClient(endpoint)
+        // Kelime listesini Worker'dan çek (uzaktan yönetilir, APK derlemeye gerek yok)
+        HedgeDetector.init(this, endpoint)
         setContent { TeyitTheme { Root() } }
     }
 
@@ -72,6 +77,9 @@ class MainActivity : ComponentActivity() {
         var hits by remember { mutableIntStateOf(0) }
         var heard by remember { mutableStateOf("") }
         var level by remember { mutableFloatStateOf(0f) }
+        // Tereddüt algılandığı an true, cevap geldiği an false.
+        // Mavi-mor dalga bu bayrağa bağlı.
+        var processing by remember { mutableStateOf(false) }
         var sessions by remember { mutableStateOf(store.load()) }
         var naming by remember { mutableStateOf(false) }
         var settings by remember { mutableStateOf(false) }
@@ -81,7 +89,12 @@ class MainActivity : ComponentActivity() {
         ) { granted ->
             if (granted) {
                 store.startSession()
-                begin(scope, { answer = it }, { draft = it }, { heard = it }, { level = it }) { hits++ }
+                begin(
+                    scope,
+                    onAnswer = { answer = it }, onDraft = { draft = it },
+                    onHeard = { heard = it }, onLevel = { level = it },
+                    onProcessing = { processing = it }, onHit = { hits++ }
+                )
                 live = true
             }
         }
@@ -89,15 +102,20 @@ class MainActivity : ComponentActivity() {
         fun toggle() {
             if (live) {
                 engine?.stop(); client.cancel()
-                live = false; draft = ""; heard = ""
+                live = false; draft = ""; heard = ""; processing = false
                 if ((store.current?.items?.size ?: 0) > 0) naming = true
                 else { store.endSession(null); sessions = store.load() }
             } else {
-                answer = null; draft = ""; hits = 0; heard = ""
+                answer = null; draft = ""; hits = 0; heard = ""; processing = false
                 if (hasMic()) {
                     store.startSession()
                     client.warm(scope)
-                    begin(scope, { answer = it }, { draft = it }, { heard = it }, { level = it }) { hits++ }
+                    begin(
+                        scope,
+                        onAnswer = { answer = it }, onDraft = { draft = it },
+                        onHeard = { heard = it }, onLevel = { level = it },
+                        onProcessing = { processing = it }, onHit = { hits++ }
+                    )
                     live = true
                 } else perm.launch(Manifest.permission.RECORD_AUDIO)
             }
@@ -135,19 +153,28 @@ class MainActivity : ComponentActivity() {
                         AnswerStage(answer, draft, live)
                     }
 
+                    // Tereddüt yakalandı, cevap aranıyor -> mavi-mor dalga
+                    ProcessingWave(
+                        active = processing,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                    )
+
                     HeardStrip(heard, live)
 
-                    Spacer(Modifier.height(18.dp))
-                    MicButton(live, level, ::toggle)
+                    Spacer(Modifier.height(14.dp))
+                    MicButton(live, processing, level, ::toggle)
                     Spacer(Modifier.height(16.dp))
 
                     Text(
                         when {
+                            processing -> "cevap aranıyor…"
                             live && hits == 0 -> "dinleniyor · henüz teyit yok"
                             live -> "$hits teyit · durdurmak için dokun"
                             else -> "yayını başlatmak için dokun"
                         },
-                        color = T.TextFaint,
+                        color = if (processing) WaveAccent else T.TextFaint,
                         fontSize = 13.sp
                     )
                     Spacer(Modifier.height(34.dp))
@@ -264,8 +291,10 @@ class MainActivity : ComponentActivity() {
     private fun SourceChip(src: String) {
         val (label, c) = when (src) {
             "web" -> "web" to T.Web
+            "yerel" -> "yerel" to T.Accent
             "cache" -> "önbellek" to T.Accent
-            "none" -> "kaynak yok" to T.Warn
+            "öznel" -> "öznel" to T.Warn
+            "yok" -> "kaynak yok" to T.Warn
             else -> "model" to T.TextDim
         }
         Box(
@@ -296,7 +325,12 @@ class MainActivity : ComponentActivity() {
     /* ------------------------- Mikrofon ------------------------- */
 
     @Composable
-    private fun MicButton(live: Boolean, level: Float, onClick: () -> Unit) {
+    private fun MicButton(
+        live: Boolean,
+        processing: Boolean,
+        level: Float,
+        onClick: () -> Unit
+    ) {
         val pulse = rememberInfiniteTransition(label = "p")
         val ring by pulse.animateFloat(
             1f, if (live) 1.22f else 1f,
@@ -307,9 +341,27 @@ class MainActivity : ComponentActivity() {
             targetValue = if (live) 1f + (level.coerceAtLeast(0f) / 30f) else 1f,
             animationSpec = tween(120), label = "v"
         )
+        // İşlem sırasında buton rengi kırmızıdan mor'a yumuşakça geçer
+        val btnColor by animateColorAsState(
+            targetValue = when {
+                processing -> WaveAccent
+                live -> T.Live
+                else -> T.Accent
+            },
+            animationSpec = tween(300), label = "btn"
+        )
 
-        Box(contentAlignment = Alignment.Center) {
-            if (live) {
+        Box(
+            modifier = Modifier.size(230.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Tereddüt yakalandı -> genişleyen mavi-mor halkalar
+            ProcessingRings(
+                active = processing,
+                baseRadiusPx = with(LocalDensity.current) { 79.dp.toPx() }
+            )
+
+            if (live && !processing) {
                 Box(
                     Modifier.size(210.dp).scale(ring)
                         .clip(CircleShape).background(T.Live.copy(alpha = 0.07f))
@@ -319,11 +371,12 @@ class MainActivity : ComponentActivity() {
                         .clip(CircleShape).background(T.Live.copy(alpha = 0.14f))
                 )
             }
+
             Box(
                 Modifier
                     .size(158.dp)
                     .clip(CircleShape)
-                    .background(if (live) T.Live else T.Accent)
+                    .background(btnColor)
                     .border(
                         width = 1.dp,
                         color = Color.White.copy(alpha = 0.10f),
@@ -498,6 +551,10 @@ class MainActivity : ComponentActivity() {
                     "sunucu: ${BuildConfig.WORKER_URL}",
                     color = T.TextFaint, fontSize = 10.sp
                 )
+                Text(
+                    "sözlük sürümü: ${HedgeDetector.lexiconVersion()}",
+                    color = T.TextFaint, fontSize = 10.sp
+                )
             }
         }
     }
@@ -526,6 +583,7 @@ class MainActivity : ComponentActivity() {
         onDraft: (String) -> Unit,
         onHeard: (String) -> Unit,
         onLevel: (Float) -> Unit,
+        onProcessing: (Boolean) -> Unit,
         onHit: () -> Unit
     ) {
         var context = ""
@@ -534,7 +592,7 @@ class MainActivity : ComponentActivity() {
             ctx = this,
             onPartial = { txt ->
                 onHeard(txt)
-                // SPEKÜLATİF: cümle bitmeden Worker'ı ısıt
+                // SPEKÜLATİF: cümle bitmeden Worker'ı ısıt (ekrana bir şey basılmaz)
                 HedgeDetector.detect(txt, isFinal = false)?.let {
                     client.fire(scope, HedgeDetector.toQuery(txt), context, speculative = true)
                 }
@@ -544,14 +602,23 @@ class MainActivity : ComponentActivity() {
                 HedgeDetector.detect(txt, isFinal = true)?.let {
                     onDraft("")
                     onHit()
+                    // Dalga BURADA başlar — cevap gelmeden önce.
+                    // Kullanıcı sistemin çalıştığını görsün, boşluğa bakmasın.
+                    onProcessing(true)
+
                     client.fire(
                         scope, HedgeDetector.toQuery(txt), context, speculative = false,
                         onDraft = onDraft,
                         onAnswer = { a ->
                             onDraft("")
                             onAnswer(a)
-                            if (a.final) store.add(txt, a.text, a.src, a.ms)
-                        }
+                            if (a.final) {
+                                // Dalga BURADA biter.
+                                onProcessing(false)
+                                store.add(txt, a.text, a.src, a.ms)
+                            }
+                        },
+                        onDone = { onProcessing(false) }   // emniyet: akış kapanırsa da bitir
                     )
                 }
                 context = (context + " " + txt).takeLast(220)

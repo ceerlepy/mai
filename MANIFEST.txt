@@ -1,0 +1,65 @@
+TEYİT — paket içeriği
+Oluşturulma: 2026-07-22 21:06 UTC
+
+Bu dosya listesindeki her şey pakette olmalı. Açtıktan sonra doğrula:
+    find . -type f | sort
+
+DOSYALAR
+  .github/workflows/android.yml
+  .github/workflows/worker.yml
+  .gitignore
+  KURULUM.md
+  MANIFEST.txt
+  README.md
+  android/.gitignore
+  android/app/build.gradle.kts
+  android/app/proguard-rules.pro
+  android/app/src/main/AndroidManifest.xml
+  android/app/src/main/java/com/vt/teyit/CheckClient.kt
+  android/app/src/main/java/com/vt/teyit/HedgeDetector.kt
+  android/app/src/main/java/com/vt/teyit/MainActivity.kt
+  android/app/src/main/java/com/vt/teyit/SpeechEngine.kt
+  android/app/src/main/java/com/vt/teyit/Store.kt
+  android/app/src/main/java/com/vt/teyit/Theme.kt
+  android/app/src/main/java/com/vt/teyit/WaveEffect.kt
+  android/app/src/main/res/drawable/ic_launcher_foreground.xml
+  android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+  android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+  android/app/src/main/res/values/colors.xml
+  android/app/src/main/res/values/strings.xml
+  android/app/src/main/res/values/themes.xml
+  android/build.gradle.kts
+  android/gradle.properties
+  android/settings.gradle.kts
+  worker/.gitignore
+  worker/package.json
+  worker/scripts/ingest.sh
+  worker/scripts/seed.json
+  worker/src/index.js
+  worker/src/knowledge.js
+  worker/src/lexicon.js
+  worker/src/router.js
+  worker/src/search.js
+  worker/src/triage.js
+  worker/test/router.test.mjs
+  worker/test/triage.test.sh
+  worker/wrangler.toml
+
+HIZLI DOĞRULAMA
+  cd worker && npm install && npm test      -> TÜM TESTLER GEÇTİ (88/88)
+
+BU TURDA EKLENEN / DEĞİŞEN
+  + android/.../WaveEffect.kt      mavi-mor işlem dalgası (YENİ)
+  ~ android/.../MainActivity.kt    processing state, MicButton mor geçiş
+  ~ android/.../Theme.kt           T.Wave rengi
+  + worker/src/lexicon.js          tüm kelime listeleri, tek kaynak (YENİ)
+  + worker/src/triage.js           regex kararsızsa modele ikili soru (YENİ)
+  ~ worker/src/router.js           UNSURE sınıfı, ek-duyarlı eşleşme
+  ~ worker/src/index.js            /lexicon, /classify uçları, triyaj
+  ~ android/.../HedgeDetector.kt   uzaktan sözlük indirme
+  + worker/test/router.test.mjs    88 test (YENİ)
+  + worker/test/triage.test.sh     deploy sonrası model testi (YENİ)
+  + KURULUM.md                     16 adımlık komut listesi (YENİ)
+
+KURULUM: KURULUM.md
+MİMARİ : README.md
