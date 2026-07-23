@@ -112,17 +112,48 @@ async function brave(env, q, signal) {
     headers: { Accept: "application/json", "X-Subscription-Token": env.BRAVE_KEY },
   });
 
-  if (r.status === 404 || r.status === 403) return braveClassic(env, q, signal);
-  if (!r.ok) return null;
+  if (r.status === 404 || r.status === 403) {
+    // Bu uç hesabın planında yok -> klasik aramaya düş
+    console.log(`[brave] llm/context ${r.status} -> klasik aramaya düşülüyor`);
+    return braveClassic(env, q, signal);
+  }
+  if (!r.ok) {
+    // Sessizce yutma: 401 (anahtar geçersiz), 429 (kota doldu) gibi
+    // durumlar görünmezse "neden hiç sonuç yok" diye günlerce aranır.
+    const body = await r.text().catch(() => "");
+    console.error(`[brave] llm/context HTTP ${r.status}: ${body.slice(0, 200)}`);
+    // 401/429 kalıcı sorun; yine de klasik ucu deneyelim, belki farklı yetki
+    return braveClassic(env, q, signal);
+  }
 
   const j = await r.json();
-  const items = j.generic || j.results || [];
-  if (!items.length) return braveClassic(env, q, signal);
+
+  // GERÇEK CEVAP YAPISI (curl ile doğrulandı, 23 Tem 2026):
+  //   { "grounding": { "generic": [ { url, title, snippets: [...] } ] } }
+  //
+  // Eskiden `j.generic` okunuyordu — öyle bir alan YOK. Sonuçlar hep boş
+  // görünüyor, klasik aramaya düşülüyor, o da ücretsiz plandaki
+  // saniyede-1-istek limitine takılıp 429 alıyordu. Sonuç: her sorguda
+  // "kaynak bulunamadı" -> ekranda "EMİN DEĞİLİM".
+  const items =
+    j.grounding?.generic ||
+    j.grounding?.results ||
+    j.generic ||
+    j.results ||
+    [];
+
+  if (!items.length) {
+    console.log(`[brave] llm/context boş döndü -> klasik aramaya düşülüyor`);
+    return braveClassic(env, q, signal);
+  }
 
   return pack(
     items.slice(0, 3).map((x) => ({
       title: x.title || "",
-      snippet: x.context || x.description || x.text || "",
+      // snippets bir DİZİ; tek metne çeviriyoruz.
+      snippet: Array.isArray(x.snippets)
+        ? x.snippets.join(" ")
+        : x.snippets || x.context || x.description || x.text || "",
       url: x.url || "",
     }))
   );
@@ -139,10 +170,16 @@ async function braveClassic(env, q, signal) {
     signal,
     headers: { Accept: "application/json", "X-Subscription-Token": env.BRAVE_KEY },
   });
-  if (!r.ok) return null;
+  if (!r.ok) {
+    const body = await r.text().catch(() => "");
+    console.error(`[brave] web/search HTTP ${r.status}: ${body.slice(0, 200)}`);
+    return null;
+  }
   const j = await r.json();
+  const hits = j.web?.results || [];
+  if (!hits.length) console.log(`[brave] web/search 0 sonuç: "${q}"`);
   return pack(
-    (j.web?.results || []).slice(0, 3).map((x) => ({
+    hits.slice(0, 3).map((x) => ({
       title: x.title, snippet: x.description || "", url: x.url,
     }))
   );
