@@ -20,7 +20,25 @@
  *   serper $0.90  ·  brave $15  ·  tavily muhtemelen ücretsiz kredide
  */
 
-const CAP_MS = 950; // aramaya sert tavan — geçerse yol A'ya düşeriz
+/**
+ * ARAMAYA SERT TAVAN — geçerse iptal edilir, kanıtsız kalınır.
+ *
+ * 1500 ms, canlı ölçümle belirlendi. Önceki değer 950 ms idi ve sorun
+ * çıkarıyordu: Brave bu iş yükünde 795-950 ms sürüyor, yani tavan tam
+ * ölçümün üstüne denk geliyordu. Arama bazen yetişiyor bazen kesiliyor,
+ * kesildiğinde `source: "none"` -> ekranda "EMİN DEĞİLİM".
+ *
+ * Gecikme bütçesi (canlı yayın eşiği 2500 ms):
+ *   niyet kontrolü  ~335 ms  -> aramayla PARALEL, ek maliyeti yok
+ *   arama            <=1500 ms  <- bu tavan
+ *   model cevabı    ~400-500 ms
+ *   ------------------------------------
+ *   toplam          ~2000 ms, 500 ms marj
+ *
+ * Yükseltmeden önce /bench çalıştır: p95 2500'ü aşıyorsa tavanı düşür
+ * ya da SEARCH_PROVIDER'ı daha hızlı bir sağlayıcıya çevir.
+ */
+const CAP_MS = 1500;
 
 export async function search(env, query, opts = {}) {
   const provider = (env.SEARCH_PROVIDER || "serper").toLowerCase();
@@ -95,14 +113,21 @@ async function brave(env, q, signal) {
   if (!env.BRAVE_KEY) return null;
 
   // LLM Context: sayfalardan ilgili parçaları çıkarıp sıralı verir.
-  // Basit faktüel sorularda token bütçesini düşük tut -> daha hızlı.
+  //
+  // PARAMETRE SEÇİMİ — az ve kanıtlanmış olan tercih edildi.
+  // Eskiden `maximum_number_of_tokens=900` ve
+  // `context_threshold_mode=strict` de gönderiliyordu; Brave bunlara
+  // HTTP 422 "Unable to validate request parameter(s)" /
+  // "greater_than_equal" döndürüyordu. Yani istek hiç işlenmiyordu:
+  // her arama boş dönüyor, ekranda "EMİN DEĞİLİM" çıkıyordu.
+  //
+  // curl ile doğrulanan çalışan set: q + country + search_lang + count.
+  // Yeni parametre eklemeden önce curl ile HTTP 200 aldığını doğrula.
   const u = new URL("https://api.search.brave.com/res/v1/llm/context");
   u.searchParams.set("q", q);
   u.searchParams.set("country", "TR");
   u.searchParams.set("search_lang", "tr");
-  u.searchParams.set("count", "5");
-  u.searchParams.set("maximum_number_of_tokens", "900");
-  u.searchParams.set("context_threshold_mode", "strict");
+  u.searchParams.set("count", "3");
 
   // Goggles ile güvenilir Türkçe kaynaklara ağırlık verilebilir:
   // if (env.BRAVE_GOGGLE) u.searchParams.set("goggles", env.BRAVE_GOGGLE);
@@ -118,11 +143,17 @@ async function brave(env, q, signal) {
     return braveClassic(env, q, signal);
   }
   if (!r.ok) {
-    // Sessizce yutma: 401 (anahtar geçersiz), 429 (kota doldu) gibi
-    // durumlar görünmezse "neden hiç sonuç yok" diye günlerce aranır.
+    // Sessizce yutma: 401 (anahtar geçersiz), 422 (parametre reddedildi),
+    // 429 (kota doldu) gibi durumlar görünmezse "neden hiç sonuç yok"
+    // diye günlerce aranır.
+    //
+    // Gövdeyi KIRPMADAN yazıyoruz: 422 hatalarında hangi parametrenin
+    // reddedildiği `meta.errors[].loc` alanında ve kırpılırsa görünmüyor.
+    // Gönderilen URL'yi de yazıyoruz (anahtar header'da, URL'de değil).
     const body = await r.text().catch(() => "");
-    console.error(`[brave] llm/context HTTP ${r.status}: ${body.slice(0, 200)}`);
-    // 401/429 kalıcı sorun; yine de klasik ucu deneyelim, belki farklı yetki
+    console.error(`[brave] llm/context HTTP ${r.status}`);
+    console.error(`[brave] istek: ${u.toString()}`);
+    console.error(`[brave] cevap: ${body}`);
     return braveClassic(env, q, signal);
   }
 
@@ -172,7 +203,9 @@ async function braveClassic(env, q, signal) {
   });
   if (!r.ok) {
     const body = await r.text().catch(() => "");
-    console.error(`[brave] web/search HTTP ${r.status}: ${body.slice(0, 200)}`);
+    console.error(`[brave] web/search HTTP ${r.status}`);
+    console.error(`[brave] istek: ${u.toString()}`);
+    console.error(`[brave] cevap: ${body}`);
     return null;
   }
   const j = await r.json();
@@ -205,7 +238,7 @@ async function exa(env, q, signal) {
   const j = await r.json();
   return pack(
     (j.results || []).slice(0, 3).map((x) => ({
-      title: x.title || "", snippet: (x.text || "").slice(0, 250), url: x.url,
+      title: x.title || "", snippet: (x.text || "").slice(0, 500), url: x.url,
     }))
   );
 }
@@ -251,8 +284,43 @@ function pack(items) {
   };
 }
 
+/**
+ * Kaynak metnini temizler.
+ *
+ * Arama sonuçları çoğu zaman sayfanın JSON-LD yapısal verisini içeriyor:
+ *   {"inLanguage":"tr-TR","articleSection":"Spor Arena","headline":"..."}
+ * Bu ham hâliyle modele gitmemeli — hem token israfı hem gürültü.
+ * İçinden okunabilir alanları (headline, description, name, text)
+ * çıkarıp geri kalanı atıyoruz.
+ */
 function strip(s) {
-  return String(s || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").slice(0, 220);
+  let t = String(s || "");
+
+  // JSON-LD parçalarından anlamlı alanları topla
+  if (t.includes('"headline"') || t.includes('"description"') || t.includes('"articleBody"')) {
+    const alanlar = [];
+    for (const anahtar of ["headline", "description", "articleBody", "name", "text"]) {
+      const m = t.match(new RegExp(`"${anahtar}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+      if (m && m[1].length > 15) alanlar.push(m[1].replace(/\\"/g, '"'));
+    }
+    if (alanlar.length) t = alanlar.join(" · ");
+  }
+
+  return t
+    .replace(/<[^>]*>/g, "")        // HTML etiketleri
+    .replace(/\{[^{}]*\}/g, " ")    // kalan süslü parantezli bloklar
+    .replace(/\\[nrt]/g, " ")       // kaçış dizileri
+    .replace(/\s+/g, " ")
+    .trim()
+    // 500 karakter: 220 fazla darcı ve ASIL BİLGİYİ kesiyordu.
+    // Ölçülen vaka: "Fenerbahçe-Gornik Zabrze maçı kaç kaç bitti? ...
+    // Talisca'nın serbest vuruştan" — skor (1-0) tam bu sınırın ötesinde
+    // kalıyor, modele hiç ulaşmıyordu. Model elindeki kırıntıdan "1-"
+    // üretti. Haber metinlerinde skor genelde ilk cümlelerden sonra gelir.
+    //
+    // Maliyet: 3 kaynak x 500 = 1500 karakter ≈ 400 token girdi.
+    // Nöron etkisi ihmal edilebilir, gecikmeye etkisi ~20ms.
+    .slice(0, 500);
 }
 
 // buildQuery topic.js'e taşındı — HEDGE listesiyle senkron kalması için

@@ -212,12 +212,27 @@ const AY = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
  *
  *   "maç sonucu" + fresh  ->  "maç sonucu 21 Temmuz 2026"
  */
-export function addTimeContext(query, topic) {
+/**
+ * Taze sorgulara açık tarih ekler ("... 22 Temmuz 2026").
+ *
+ * @param query   arama sorgusu (buildQuery çıktısı, zaman kelimeleri temiz)
+ * @param topic   konu sınıfı
+ * @param orijinal kullanıcının HAM cümlesi — tarih ofsetini buradan okur
+ *
+ * NEDEN `orijinal` AYRI GELİYOR: buildQuery "dünkü/dün" gibi göreli zaman
+ * kelimelerini sorgudan siliyor (arama motorunu fikstür sayfalarına
+ * yönlendiriyorlar). Ama tarihi hesaplamak için o kelime GEREKLİ:
+ * "dünkü" -> bugün eksi 1 gün. Temizlenmiş metne bakarsak ofset kaybolur
+ * ve dünün maçı için bugünün tarihi aranır.
+ */
+export function addTimeContext(query, topic, orijinal = "") {
   if (topic !== TOPIC.FRESH) return query;
 
-  const t = query.toLowerCase();
+  // Ofseti ham metinden oku; yoksa sorgunun kendisine bak.
+  const t = (orijinal || query).toLowerCase();
   const now = new Date();
 
+  // Gelecek: yarın kesin bir gün, dar pencere sorun değil.
   if (has(t, TIME_FUTURE)) {
     const d = new Date(now.getTime() + 86400000);
     return `${query} ${d.getDate()} ${AY[d.getMonth()]} ${d.getFullYear()}`;
@@ -225,7 +240,23 @@ export function addTimeContext(query, topic) {
 
   const hit = TIME_PAST.find((x) => has(t, [x.k]));
   const d = new Date(now.getTime() - (hit ? hit.gun : 0) * 86400000);
-  return `${query} ${d.getDate()} ${AY[d.getMonth()]} ${d.getFullYear()}`;
+
+  // BUGÜN -> kesin gün. Konuşmacı "bugün" derken yanılmaz.
+  if (!hit || hit.gun === 0) {
+    return `${query} ${d.getDate()} ${AY[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  // GEÇMİŞ REFERANS -> sadece AY + YIL, kesin gün YOK.
+  //
+  // Neden: konuşma dilinde "dünkü maç" çoğu zaman kesin değil — maç iki
+  // gün önce de olmuş olabilir. Kesin gün eklersek aramayı yanlış güne
+  // kilitliyoruz ve doğru sonuç hiç gelmiyor. Ay+yıl toleranslı bir
+  // pencere veriyor; arama motoru zaten güncelliğe göre sıralıyor, en
+  // yeni sonucu öne çıkarıyor.
+  //
+  // Ay sınırında (ayın 1-2'si) bir önceki ayı da eklemek gerekebilir;
+  // şu an eklenmiyor, gerekirse /debug ile ölçüp karar ver.
+  return `${query} ${AY[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 /**
@@ -236,12 +267,40 @@ export function buildQuery(q, context = "") {
   const HEDGE_RE = new RegExp(`\\b(${HEDGE.join("|")})\\b`, "gi");
   const FILLER = /\b(şey|yani|işte|hani|falan|filan|bir|bu|şu|çok|daha|ama|için|ile|olarak|gibi|kadar|sonra|önce|tabii|aslında|acaba)\b/gi;
 
-  const s = ((context ? context + " " : "") + q)
+  // ZAMAN KELİMELERİ SORGUDAN ÇIKAR.
+  // addTimeContext zaten açık tarihi ekliyor ("22 Temmuz 2026").
+  // "dünkü" gibi göreli ifadeler sorguda kalırsa arama motoru bugünün
+  // FİKSTÜR sayfalarını döndürüyor (ölçüldü: "dünkü maç 22 Temmuz 2026"
+  // -> "Bugün kimin maçı var, hangi kanalda" programı).
+  //
+  // \b KULLANILMIYOR: "dünkü" sonundaki "ü" ASCII olmadığı için
+  // JavaScript'te kelime sınırı eşleşmez. Unicode bakışları şart.
+  const ZAMAN = /(?<!\p{L})(dünkü|dün|bugünkü|bugün|az önce|demin|biraz önce|geçen (hafta|ay|sene|yıl)|bu (sabah|akşam|gece|hafta|ay))(?!\p{L})/giu;
+
+  // SONUÇ NİYETİ. "ne oldu / kim kazandı / kaç kaç" soruları bir SONUÇ
+  // arıyor. Sorguya "sonucu" eklemek fikstür yerine skor sayfalarını
+  // getiriyor.
+  //
+  // DİKKAT: "ne oldu" aynı zamanda HEDGE listesinde, yani birazdan
+  // sorgudan silinecek. O yüzden niyeti HAM metinden, temizlikten ÖNCE
+  // tespit ediyoruz — yoksa sinyal kaybolur.
+  const SONUC_SORUSU = /(ne oldu|ne olmuş|sonucu ne|sonuç ne|kim kazandı|kaç kaç|skor)/i;
+  const OLAY_BAGLAMI = /(maç|müsabaka|karşılaşma|derbi|final|seçim|oylama|duruşma|dava)/i;
+
+  const ham = (context ? context + " " : "") + q;
+  const sonucIstiyor = SONUC_SORUSU.test(ham) && OLAY_BAGLAMI.test(ham);
+
+  const s = ham
     .replace(HEDGE_RE, " ")
+    .replace(ZAMAN, " ")
     .replace(FILLER, " ")
     .replace(/[^\p{L}\p{N}\s%.,]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-  return s.split(" ").filter((x) => x.length > 2).slice(0, 8).join(" ");
+  const kelimeler = s.split(" ").filter((x) => x.length > 2).slice(0, 7);
+  if (sonucIstiyor && !kelimeler.some((k) => /sonu[cç]/i.test(k))) {
+    kelimeler.push("sonucu");
+  }
+  return kelimeler.join(" ");
 }

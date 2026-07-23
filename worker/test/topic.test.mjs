@@ -210,6 +210,21 @@ const SAFETY = [
    "Taze veri uzun saklanmamalı"],
   ["STATIC TTL uzun (>=1 gün)", () => route(TOPIC.STATIC).ttl >= 86400,
    "Çanakkale'nin yılı değişmeyecek"],
+  ["Zaman kelimesi sorgudan cikar", () => !buildQuery("dünkü fenerbahçe maçı ne oldu").includes("dünkü"),
+   "dunku -> fikstur sayfasi getiriyor, tarih zaten ayrica ekleniyor"],
+  ["Sonuc niyeti sorguya eklenir", () => buildQuery("dünkü maçı ne oldu").includes("sonucu"),
+   "'ne oldu' + mac -> skor sayfasi istiyoruz"],
+  ["Gecmis referansta KESIN GUN eklenmez", () => {
+     const q = addTimeContext(buildQuery("dünkü maç ne oldu"), "fresh", "dünkü maç ne oldu");
+     const dun = new Date(Date.now() - 86400000);
+     // ay+yil olmali, gun OLMAMALI
+     return !q.includes(` ${dun.getDate()} `) && /\d{4}$/.test(q);
+   }, "konusma dilinde 'dunku' kesin degil; kesin gun aramayi yanlis gune kilitler"],
+  ["Bugun referansinda kesin gun eklenir", () => {
+     const bugun = new Date();
+     const q = addTimeContext(buildQuery("bugünkü maç ne oldu"), "fresh", "bugünkü maç ne oldu");
+     return q.includes(String(bugun.getDate()));
+   }, "'bugun' derken konusmaci yanilmaz"],
   ["Isimle hitap + soru tetikler", () => shouldTrigger("Kenan bu olay ne oldu biliyor musun") === true,
    "sunucu birine hitap ederek sorabilir"],
   ["Desen: soru eki yakalanir", () => shouldTrigger("zam açıklandı mı") === true,
@@ -291,6 +306,95 @@ for (const [input, mustHave, mustNotHave] of QUERY_CASES) {
   const okNot = mustNotHave.every((w) => !out.toLowerCase().includes(w));
   const ok = check(input, okHave && okNot, mustHave.join(","), out, "hedge temizliği");
   console.log(`${ok ? "✓" : "✗"} "${input}" -> "${out}"`);
+}
+
+/* ------------------------------------------------------------------ */
+/* 9. SKOR ONARIMI                                                      */
+/* index.js icindeki repairScore ile AYNI mantik. Orasi degisirse       */
+/* burasi da guncellenmeli.                                             */
+/* ------------------------------------------------------------------ */
+
+function repairScore(answer, evidenceText) {
+  if (!answer || !evidenceText) return answer;
+  const yarim = answer.match(/(\d{1,2})-(?!\d)/);
+  if (!yarim) return answer;
+  const ilkSayi = yarim[1];
+  const tam = evidenceText.match(new RegExp(`\\b${ilkSayi}-(\\d{1,2})\\b`));
+  if (!tam) return answer;
+  return answer.replace(`${ilkSayi}-`, `${ilkSayi}-${tam[1]}`);
+}
+
+console.log("\n=== 9. SKOR ONARIMI ===\n");
+{
+  const kanit = "Sari-lacivertli ekip mactan 1-0 galip ayrildi. Golu Talisca kaydetti.";
+  const VAKALAR = [
+    ["yarim skor tamamlanir",        "maci 1- bitti",   "maci 1-0 bitti"],
+    ["tam skora dokunulmaz",         "maci 1-0 bitti",  "maci 1-0 bitti"],
+    ["kanitta yoksa dokunulmaz",     "maci 3- bitti",   "maci 3- bitti"],
+    ["skor olmayan metne dokunulmaz","enflasyon 32,11", "enflasyon 32,11"],
+  ];
+  for (const [ad, girdi, beklenen] of VAKALAR) {
+    const c = repairScore(girdi, kanit);
+    const ok = check(ad, c === beklenen, beklenen, c, "repairScore");
+    console.log(`${ok ? "✓" : "✗"} ${ad}`);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 10. SAYI DOGRULAMA (uydurmaya karsi ag)                              */
+/* index.js icindeki numbersGrounded ile AYNI mantik.                   */
+/* ------------------------------------------------------------------ */
+
+function numbersGrounded(answer, evidenceText) {
+  if (!answer || !evidenceText) return true;
+  const norm = (x) => x.replace(/[.,]/g, "");
+  const kanit = norm(evidenceText);
+  const sayilar = answer.match(/\d[\d.,]{1,}/g) || [];
+  for (const sy of sayilar) if (!kanit.includes(norm(sy))) return false;
+  return true;
+}
+
+console.log("\n=== 10. SAYI DOGRULAMA ===\n");
+{
+  const kanit = "Yillik TUFE yuzde 32,11 oldu. Asgari ucret net 28.075,50 TL.";
+  const VAKALAR = [
+    ["kanittaki sayi gecer",        "Enflasyon yuzde 32,11",   true],
+    ["ondalik ayrac farki tolere",  "Enflasyon yuzde 32.11",   true],
+    ["binlik ayrac tolere",         "Asgari ucret 28075,50 TL",true],
+    ["uydurma sayi REDDEDILIR",     "Enflasyon yuzde 64,20",   false],
+    ["sayisiz cevap gecer",         "Rakam aciklanmadi",       true],
+  ];
+  for (const [ad, cevap, beklenen] of VAKALAR) {
+    const c = numbersGrounded(cevap, kanit);
+    const ok = check(ad, c === beklenen, String(beklenen), String(c), "numbersGrounded");
+    console.log(`${ok ? "✓" : "✗"} ${ad}`);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 11. TOKEN AKISI — falsy token tuzagi                                 */
+/* index.js sseTokens ile AYNI kontrol.                                 */
+/* ------------------------------------------------------------------ */
+
+function tokenGecer(tok) {
+  return tok !== undefined && tok !== null && tok !== "";
+}
+
+console.log("\n=== 11. TOKEN AKISI ===\n");
+{
+  const VAKALAR = [
+    ["metin '1' gecer",       "1",        true],
+    ["metin '0' gecer",       "0",        true],
+    ["SAYI 0 gecer",          0,          true],
+    ["bos string atlanir",    "",         false],
+    ["null atlanir",          null,       false],
+    ["undefined atlanir",     undefined,  false],
+  ];
+  for (const [ad, tok, beklenen] of VAKALAR) {
+    const c = tokenGecer(tok);
+    const ok = check(ad, c === beklenen, String(beklenen), String(c), "sseTokens falsy tuzagi");
+    console.log(`${ok ? "✓" : "✗"} ${ad}`);
+  }
 }
 
 /* ================================================================== */

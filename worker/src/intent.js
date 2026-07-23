@@ -33,11 +33,24 @@
 
 const MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 
-/** Sert tavan. Aşılırsa güvenli tarafa düşülür. */
-const CAP_MS = 400;
+/**
+ * Sert tavan. Aşılırsa güvenli tarafa düşülür (wantsInfo = true).
+ *
+ * 600 ms, canlı ölçümle belirlendi. Önceki değer 400 ms idi ve sınırdaydı:
+ * ölçülen niyet süresi 116-335 ms arasında oynuyor, soğuk çağrıda 400'ü
+ * aşıp TIMEOUT veriyordu. TIMEOUT'ta karar modelin değil, güvenli
+ * varsayılanın oluyor — yani gereksiz tetikleme.
+ *
+ * Yükseltmenin gecikme maliyeti YOK: niyet kontrolü kanıt toplamayla
+ * PARALEL koşuyor ve kanıt toplama tavanı 1500 ms. Yani 600 ms hâlâ
+ * aramanın gölgesinde kalıyor, kullanıcıya hiçbir şey yansımıyor.
+ */
+const CAP_MS = 600;
 
 const SYSTEM =
-  "Sadece 'EVET' veya 'HAYIR' yaz. Başka hiçbir şey yazma.";
+  "İki satır yaz, başka hiçbir şey yazma. " +
+  "Birinci satır: EVET veya HAYIR. " +
+  "İkinci satır: arama motoruna yazılacak sorgu (sadece anahtar kelimeler).";
 
 const PROMPT = `Canlı yayında konuşan bir sunucunun cümlesini değerlendir.
 
@@ -69,7 +82,29 @@ HAYIR olanlar:
 "dünkü maçı sonra konuşuruz" -> HAYIR
 "neyse konumuza dönelim" -> HAYIR
 {CONTEXT}
-Cümle: "{TEXT}"`;
+Cümle: "{TEXT}"
+
+Cevabını İKİ SATIR olarak yaz:
+
+1. satır: EVET veya HAYIR
+
+2. satır: Bu bilgiyi bulmak için arama motoruna ne yazardın?
+   Sadece anahtar kelimeler yaz, soru cümlesi yazma.
+   Konuşmacının ne öğrenmek istediğini yakala:
+     "maçı ne oldu"      -> skor arıyor  -> "... maç sonucu skor"
+     "ne zaman açıklandı"-> tarih arıyor -> "... açıklanma tarihi"
+     "kaç oldu"          -> rakam arıyor -> "... son rakam"
+   Özel isimleri (takım, kişi, kurum) mutlaka koru.
+   HAYIR yazdıysan ikinci satıra sadece "-" yaz.
+
+Örnek:
+Cümle: "dünkü fenerbahçe maçı ne oldu"
+EVET
+Fenerbahçe maç sonucu skor
+
+Cümle: "bence enflasyon çok yüksek"
+HAYIR
+-`;
 
 /**
  * @param {object} env
@@ -94,29 +129,31 @@ export async function checkIntent(env, text, context = "") {
           { role: "system", content: SYSTEM },
           { role: "user", content: prompt },
         ],
-        max_tokens: 3,     // "EVET" tek token
+        max_tokens: 40,    // 1. satır karar + 2. satır sorgu
         temperature: 0,    // deterministik
       }),
       sleep(CAP_MS).then(() => null),
     ]);
 
-    if (!r) return { wantsInfo: true, latencyMs: Date.now() - t0, raw: "TIMEOUT" };
+    if (!r) return { wantsInfo: true, searchQuery: null, latencyMs: Date.now() - t0, raw: "TIMEOUT" };
 
     const raw = String(r.response || "").trim();
-    const t = raw.toUpperCase().replace(/[^A-ZİĞÜŞÖÇ]/g, "");
+    const satirlar = raw.split("\n").map((x) => x.trim()).filter(Boolean);
 
-    if (t.startsWith("HAYIR")) {
-      return { wantsInfo: false, latencyMs: Date.now() - t0, raw };
-    }
-    if (t.startsWith("EVET")) {
-      return { wantsInfo: true, latencyMs: Date.now() - t0, raw };
-    }
+    const karar = (satirlar[0] || "").toUpperCase().replace(/[^A-ZİĞÜŞÖÇ]/g, "");
+    // İkinci satır arama sorgusu. "-" veya boşsa regex sorgusuna düşülür.
+    const ham = (satirlar[1] || "").replace(/^["'\-\s]+|["'\s]+$/g, "");
+    const searchQuery = ham.length > 4 ? ham.slice(0, 120) : null;
 
-    // Beklenmedik cevap -> güvenli taraf
-    return { wantsInfo: true, latencyMs: Date.now() - t0, raw };
+    if (karar.startsWith("HAYIR")) {
+      return { wantsInfo: false, searchQuery: null, latencyMs: Date.now() - t0, raw };
+    }
+    // EVET veya beklenmedik cevap -> güvenli taraf (tetikle)
+    return { wantsInfo: true, searchQuery, latencyMs: Date.now() - t0, raw };
   } catch (e) {
     return {
       wantsInfo: true,
+      searchQuery: null,
       latencyMs: Date.now() - t0,
       raw: `ERROR: ${String(e?.message || e)}`,
     };
