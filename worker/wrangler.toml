@@ -24,20 +24,23 @@ INTENT_BEFORE_SEARCH = "false"
 # Aynı soru tekrar gelirse ~20ms, arama ücreti de ödenmez.
 #   npx wrangler kv namespace create CACHE
 # [[kv_namespaces]]
-# binding = "CACHE"          # ← SABİT, kodda env.CACHE yazıyor
+# binding = "CACHE"
 # id = "BURAYA_KV_ID"
+[[kv_namespaces]]
+binding = "CACHE"
+id = "5b93bf73843345febd465f4ed008f394"
 
 # ---- Vectorize: yerel bilgi tabanı (ASIL KAZANÇ) --------------------
 # Enflasyon, asgari ücret, nüfus gibi yarı-güncel sayısalları önceden
 # yükle -> ~80ms'de cevaplanır, web aramasına HİÇ gidilmez.
 # Arama hacmini ~10 kat düşürür, ücretsiz kredi rahat yeter.
-#   npx wrangler vectorize create mai-knowledge --dimensions=1024 --metric=cosine
+#   npx wrangler vectorize create mai --dimensions=1024 --metric=cosine
 # [[vectorize]]
-# binding = "VEC"            # ← SABİT, kodda env.VEC yazıyor
-# index_name = "mai-knowledge"   # ← create komutunda verdiğin isimle AYNI olmalı
-
-[observability]
-enabled = true
+# binding = "VEC"
+# index_name = "mai"
+[[vectorize]]
+binding = "VEC"
+index_name = "mai"
 
 # invocation_logs: her istek için otomatik bir satır (yol, durum, süre).
 # Kod içindeki console.log çıktıları da buraya akar.
