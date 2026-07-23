@@ -543,3 +543,55 @@ istekte ~200 ms kazandırır.
 döndürmez. Bunun yerine `source: "none"` ve `"EMİN DEĞİLİM"` döner. Sebebi:
 canlı yayında hata ekranı göstermek, "bilmiyorum" demekten kötüdür.
 Ne olduğunu görmek için `/debug` veya `npx wrangler tail` kullan.
+
+
+---
+
+# Canlı log izleme
+
+Worker her `/check` isteği için tek satırlık teşhis logu yazar:
+
+```
+[check] q="enflasyon kacti" topic=semi wants=true by=model src=local intentMs=116 totalMs=397 refs=2
+```
+
+| Alan | Anlamı |
+|---|---|
+| `q` | soru (ilk 80 karakter) |
+| `topic` | fresh / semi / static |
+| `wants` | niyet kararı — false ise ekrana hiçbir şey basılmadı |
+| `by` | kararı kim verdi: regex / model / cache |
+| `src` | cevap nereden: cache / local / web / model / no-request |
+| `intentMs` | niyet kontrolü süresi |
+| `totalMs` | toplam süre |
+
+Kanıt toplamada sorun olursa ayrıca şunlar düşer:
+
+```
+[evidence] yerel eşleşme yok -> web'e düşülüyor
+[evidence] yerel kayıt BAYAT (maxDays=45) -> web'e düşülüyor
+[evidence] web sonuç döndürmedi: "seçim zaman yapılacak"
+[evidence] vectorize hata: ...
+[evidence] kanıt YOK (local=true web=false modelOK=true)
+```
+
+**İzlemek için:**
+
+```bash
+cd worker && npx wrangler tail
+```
+
+> Kök dizinden çalıştırırsan "Worker name missing" hatası alırsın, çünkü
+> `wrangler.toml` `worker/` içinde. Alternatif: `npx wrangler tail mai`
+
+Bu, mobil bağlantı sorunlarını teşhis etmenin en hızlı yolu: telefon istek
+atıyorsa log düşer, düşmüyorsa istek hiç ulaşmıyor demektir (genelde APK'ya
+gömülü `WORKER_URL` yanlıştır).
+
+Ayar `wrangler.toml` içinde:
+
+```toml
+[observability.logs]
+enabled = true
+invocation_logs = true
+```

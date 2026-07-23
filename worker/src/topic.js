@@ -26,7 +26,7 @@
 
 import {
   HEDGE, HEDGE_IGNORE, HARD_SKIP,
-  TIME_PAST, TIME_FUTURE, FUTURE_TENSE, SCHEDULE_MARKER, ERA,
+  TIME_PAST, TIME_FUTURE, FUTURE_TENSE, SCHEDULE_MARKER, QUESTION_MARKER, QUESTION_PATTERN, ERA,
   FRESH_EVENT, SEMI_INDICATOR,
   matchAny,
 } from "./lexicon.js";
@@ -84,6 +84,34 @@ export function precheckIntent(text) {
 }
 
 /** Tereddüt ifadesi var mı? Uygulamanın tetiklenme kapısı. */
+/**
+ * CİHAZ KAPISI — sunucuya istek gönderilsin mi?
+ *
+ * İki yol var, biri yeterli:
+ *   1. TEREDDÜT  : "sanırım", "emin değilim", "neydi"
+ *   2. DOĞRUDAN SORU: "maçın sonucu ne oldu", "seçim ne zaman"
+ *
+ * Başta sadece (1) vardı ve gerçek kullanımda çok soru kaçıyordu:
+ * sunucu "acaba" demeden düz soru sorunca uygulama susuyordu.
+ *
+ * HEDGE_IGNORE ("neyse", "boş ver") her iki yolu da kapatır — konuyu
+ * kapatan biri cevap beklemiyordur.
+ *
+ * Bu kapı GENİŞ bilerek: retorik sorular da geçer. Onları sunucudaki
+ * niyet modeli eler. Ucuz regex geniş ağ atar, pahalı model süzer.
+ */
+export function shouldTrigger(text) {
+  const t = (text || "").toLowerCase();
+  if (has(t, HEDGE_IGNORE)) return false;
+  if (has(t, HEDGE) || has(t, QUESTION_MARKER)) return true;
+  // Liste yakalamadıysa dilbilgisi deseni dene (soru eki / soru sözcüğü+fiil)
+  return QUESTION_PATTERN.some((re) => re.test(t));
+}
+
+/**
+ * Sadece tereddüt var mı? (shouldTrigger'ın dar hali)
+ * Geriye dönük uyumluluk ve teşhis için duruyor.
+ */
 export function hasHedge(text) {
   const t = (text || "").toLowerCase();
   if (has(t, HEDGE_IGNORE)) return false;

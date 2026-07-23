@@ -465,3 +465,37 @@ if (!env.VEC) return null;     // Vectorize yoksa yerel arama atlanır
 | Embedding maliyeti | Her `lookupLocal` bir embedding çağrısı demek (~40 ms). FRESH'te kapatmamızın sebebi de bu. |
 | Eşik ayarı | `MIN_SCORE` kör bir sayı. Gerçek kullanımda skorları loglayıp ayarlamak gerekir. |
 | Türkçe embedding | `bge-m3` çok dilli ve Türkçe destekliyor ama İngilizce kadar keskin değil. Alakasız eşleşme görürsen eşiği yükselt. |
+
+
+---
+
+# Benzerlik eşiği — Türkçe için ölçümle ayarlandı
+
+`knowledge.js` içindeki `MIN_SCORE`, bir Vectorize eşleşmesinin kullanılabilir
+sayılması için gereken en düşük kosinüs benzerliğidir.
+
+**Değer: 0.48** (başlangıçta 0.62 idi).
+
+Neden değişti — canlı `/debug` çıktısından gelen gerçek skorlar:
+
+| Kayıt | Skor | 0.62 ile | 0.48 ile |
+|---|---|---|---|
+| `tufe-gruplar` (Enflasyonun alt kalemleri) | 0.542 | ✗ elenir | ✓ geçer |
+| `tufe-yillik` (Yıllık TÜFE) — **aranan kayıt** | 0.526 | ✗ elenir | ✓ geçer |
+| `politika-faizi` | 0.408 | ✗ | ✗ (doğru) |
+| `asgari-ucret` | 0.385 | ✗ | ✗ (doğru) |
+
+"enflasyon kacti" sorusu ile "Yıllık tüketici enflasyonu (TÜFE)" başlığı
+doğru bir eşleşme, ama 0.62 eşiğini geçemiyordu; sorgu web'e düşüyor ve
+`semi` gecikmesi 2001 ms oluyordu. Eşik 0.48'e çekilince aynı sorgu
+Vectorize'dan cevaplanmaya başladı ve **p95 gecikme 2001 ms → 397 ms**
+oldu (5 kat).
+
+**Neden 0.62 fazla katıydı:** `bge-m3` çok dilli bir model. Türkçe kısa soru
++ kısa başlık çiftlerinde skorlar doğal olarak 0.45-0.55 bandında oturuyor;
+0.62+ skorlar İngilizce uzun metinlerde görülüyor. Eşik dile göre ayarlanmalı.
+
+**Nasıl ayarlanır:** `/debug?q=...` çıktısındaki `similarityScore`
+değerlerine bak. Doğru eşleşmeler ile alakasızlar arasında net bir boşluk
+varsa eşiği o boşluğa koy. Yukarıdaki örnekte doğrular 0.52-0.54,
+alakasızlar 0.38-0.41 — 0.48 tam ortada.

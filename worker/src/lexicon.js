@@ -22,7 +22,7 @@
  * niyet tahmini mi? İkincisiyse modele ait.
  */
 
-export const VERSION = 7;
+export const VERSION = 8;
 
 /* ================================================================== */
 /* 1. TEREDDÜT — uygulamanın tetiklenme kapısı                         */
@@ -216,12 +216,73 @@ export const FRESH_EVENT = [
  */
 export const HARD_SKIP = [
   // Görüş bildirimi — hiçbir bağlamda bilgi isteği değil
-  "bence", "sence", "bana kalırsa", "bana göre", "kanaatimce",
+  "bence", "sence", "sizce", "bana kalırsa", "bana göre", "kanaatimce",
   // Doğrudan görüş isteme — bizden değil, muhataptan isteniyor
   "sizce ne olur", "sizce ne olacak", "beklentiniz", "tahmininiz",
   "ne dersiniz", "katılıyor musunuz",
   // Tahmin — henüz olmamış, kaynak yok
   "kim kazanır", "kim kaybeder", "kim şampiyon olur",
+];
+
+/**
+ * DOĞRUDAN SORU KALIPLARI — tereddüt olmadan da bilgi istenebilir.
+ *
+ * Cihaz kapısı başta SADECE tereddüt ("sanırım", "emin değilim") arıyordu.
+ * Ama gerçek konuşmada sunucu çoğu zaman düz soru sorar:
+ *
+ *   "maçın sonucu ne oldu"          -> tereddüt yok, ama bilgi isteği
+ *   "seçim ne zaman"                -> tereddüt yok, ama bilgi isteği
+ *   "en son nüfus sayımı kaç"       -> tereddüt yok, ama bilgi isteği
+ *
+ * Bunlar eskiden hiç sunucuya gitmiyordu — kapı susuyordu. Artık soru
+ * kalıbı da kapıyı açıyor.
+ *
+ * ÖNEMLİ: Bu liste "cevap ver" demek DEĞİL, sadece "sunucuya sor" demek.
+ * Retorik sorular ("peki ne oldu?", "neden acaba?") da bu kapıdan geçer;
+ * onları intent.js'teki model eler. Ucuz regex geniş ağ atar, pahalı
+ * model süzer — mimarinin temel iş bölümü.
+ */
+export const QUESTION_MARKER = [
+  // Ne/kim/kaç kalıpları
+  "ne oldu", "ne olmuş", "neydi", "ne kadar", "ne zaman", "ne vakit",
+  "kaç oldu", "kaçtı", "kaç idi", "kaçta", "kaç kişi", "kaç yıl",
+  "kim oldu", "kimdi", "kim kazandı", "kim yaptı",
+  "hangi yıl", "hangi gün", "hangi tarih", "hangisi",
+  "nerede", "nereye", "nereden", "nasıl oldu",
+  // Doğrulama soruları
+  "var mıydı", "var mı", "oldu mu", "olmuş mu", "bitti mi", "başladı mı",
+  "açıklandı mı", "kesinleşti mi", "doğru mu", "gerçek mi",
+  // Sonuç/rakam soruları
+  "sonucu ne", "sonuç ne", "skor ne", "oran ne", "rakam ne",
+];
+
+/**
+ * SORU DESENİ — liste tek başına yetmiyor.
+ *
+ * Gerçek konuşmada soru kalıpları sonsuz çeşitlilikte:
+ *   "Kenan bey en son ne açıklandı"   -> listede yok
+ *   "bu olayı kim duyurdu"            -> listede yok
+ *   "toplantı bitti mi acaba"         -> listede var ama şans eseri
+ *
+ * Liste büyütmek yerine dilbilgisi kuralı: Türkçe'de soru iki şekilde
+ * kurulur — soru eki (mı/mi/mu/mü) veya soru sözcüğü (ne/kim/kaç/hangi...)
+ * + çekimli fiil. İkisi de desenle yakalanır, yüzlerce cümle tek kuralla.
+ *
+ * "ne güzel", "ne yazık ki" gibi ünlem kalıpları YAKALANMAZ, çünkü
+ * ardından çekimli fiil gelmiyor.
+ */
+export const QUESTION_PATTERN = [
+  // Soru eki: "biliyor musun", "açıklandı mı", "gitti mi"
+  //
+  // DİKKAT — \b kullanılmıyor: JavaScript'te \b ASCII tabanlıdır ve
+  // Türkçe harflerde (ı, ş, ğ, ç, ö, ü) sınır tutmaz. "mı" kelimesinin
+  // sonundaki "ı" ASCII olmadığı için \b eşleşmez ve desen kaçırır.
+  // Bunun yerine Unicode ileri/geri bakış kullanıyoruz.
+  /(?<!\p{L})(mı|mi|mu|mü|mısın|misin|musun|müsün|mıydı|miydi|muydu|müydü)(?!\p{L})/u,
+  // Soru sözcüğü + çekimli fiil: "ne açıklandı", "kim duyurdu", "ne dedi"
+  /(?<!\p{L})(ne|kim|kaç|hangi|nerede|nereden|nasıl|niye|neden)\s+\p{L}+(dı|di|du|dü|tı|ti|tu|tü|mış|miş|muş|müş|yor|dık|dik)(?!\p{L})/u,
+  // Soru sözcüğü tek başına belirgin olanlar
+  /(?<!\p{L})(ne zaman|ne kadar|kaç tane|kaç kişi|hangi yıl)(?!\p{L})/u,
 ];
 
 /**
@@ -300,6 +361,10 @@ export function lexiconPayload() {
     version: VERSION,
     hedge: HEDGE,
     hedgeIgnore: HEDGE_IGNORE,
+    // Doğrudan sorular da kapıyı açar — tereddüt şart değil.
+    question: QUESTION_MARKER,
+    // Desenler string olarak gider; cihaz Regex'e çevirir.
+    questionPattern: QUESTION_PATTERN.map((r) => r.source),
     // Cihazda kesin elenecekler. Kısa tutuldu; asıl eleme sunucuda,
     // niyet kontrolüyle yapılıyor.
     noTrigger: HARD_SKIP,

@@ -221,6 +221,39 @@ sunucu gerçekten yardım isterken sessiz kalırsın. Bu yüzden regex sadece
 
 ---
 
+# 2b. Cihaz kapısı — tereddüt VEYA doğrudan soru
+
+Uygulama her cümleyi sunucuya göndermez; cihazda ucuz bir kapı var.
+Başlangıçta bu kapı sadece **tereddüt** arıyordu ("sanırım", "emin değilim").
+Gerçek kullanımda büyük bir açık çıktı: sunucu çoğu zaman tereddüt etmeden
+düz soru sorar ve yine cevap bekler.
+
+```
+"türkiyenin bir sonraki seçimi ne zaman"   <- tereddüt yok, ama bilgi isteği
+"çanakkale boğazı ne zaman kuruldu"        <- tereddüt yok, ama bilgi isteği
+"Kenan bu olay ne oldu biliyor musun"      <- tereddüt yok, ama bilgi isteği
+```
+
+Zihinsel model: **MAI kulaklıktaki yapımcıdır.** Doğrudan soruya cevap verir,
+tereddüt duyunca kendiliğinden düzeltir, laf kalabalığında susar.
+
+Kapı artık iki yoldan biriyle açılıyor (`shouldTrigger`):
+
+| Yol | Örnek | Nasıl tanınır |
+|---|---|---|
+| Tereddüt | "enflasyon sanırım %35ti" | `HEDGE` listesi (49 madde) |
+| Doğrudan soru | "maçın sonucu ne oldu" | `QUESTION_MARKER` listesi + `QUESTION_PATTERN` deseni |
+
+Soru tanıma liste değil **dilbilgisi deseni** kullanır — ayrıntısı
+TRIGGER-LOGIC.md §2b'de. Özet: Türkçede soru ya soru ekiyle (mı/mi/mu/mü) ya
+soru sözcüğü + çekimli fiille kurulur; iki desen yüzlerce cümleyi kapsar.
+"ne güzel" gibi ünlem kalıpları çekimli fiil taşımadığı için elenir.
+
+Kapı bilerek geniş: retorik sorular da geçer, onları sunucudaki niyet modeli
+eler. Ucuz regex geniş ağ atar, pahalı model süzer.
+
+---
+
 # 3. Gecikme mimarisi
 
 ## Katman tablosu
@@ -596,7 +629,15 @@ Sonra Actions → **APK Build** → Run workflow. APK hem artifact hem **Release
 Yerelde:
 ```bash
 cd android
-./gradlew assembleRelease -PworkerUrl=https://mai.<subdomain>.workers.dev
+# Gradle wrapper (gradlew) bu pakette YOK — ikili dosya içerdiği için
+# eklenmedi. Yerelde derlemek için sistemde kurulu gradle'ı kullan:
+gradle assembleRelease -PworkerUrl=https://mai.<subdomain>.workers.dev
+
+# gradle kurulu değilse:  brew install gradle   (macOS)
+# Wrapper istiyorsan bir kez:  gradle wrapper    -> sonra ./gradlew çalışır
+#
+# NOT: APK'yı GitHub Actions'ta derlemek daha kolay — orada gradle hazır.
+# Actions -> APK Build -> Run workflow
 ```
 
 ## 4.6 Worker'ı GitHub'dan deploy etmek istersen

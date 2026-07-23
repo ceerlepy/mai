@@ -1,14 +1,33 @@
 MAI — canlı yayın teyit asistanı
-Oluşturulma: 2026-07-22 23:28 UTC
+Oluşturulma: 2026-07-23 07:09 UTC
 Dosya sayısı: 42
-Sözlük sürümü: 7 · Test: 72/72
+Sözlük sürümü: 8 · Test: 87/87
 
 MİMARİ — İKİ BAĞIMSIZ SORU
   KONU  (nesnel)  : bilgi hangi türden?   -> topic.js,  regex,  ~0 ms,  0 nöron
-  NİYET (öznel)   : bilgi isteniyor mu?   -> intent.js, llama,  ~200 ms, 1.4 nöron
+  NİYET (öznel)   : bilgi isteniyor mu?   -> intent.js, llama,  ~116 ms, 1.4 nöron
 
   Paralel koşarlar. Niyet her zaman kanıt toplamadan kısa olduğu için
   ek gecikme yaratmaz — aramanın gölgesinde kalır.
+
+CİHAZ KAPISI — TEREDDÜT VEYA DOĞRUDAN SORU
+  MAI kulaklıktaki yapımcıdır: doğrudan soruya cevap verir, tereddüt
+  duyunca kendiliğinden düzeltir, laf kalabalığında susar.
+
+  a) tereddüt  : HEDGE listesi (49 madde) — "sanırım", "emin değilim"
+  b) düz soru  : QUESTION_MARKER (39) + QUESTION_PATTERN (3 desen)
+
+  Soru tanıma liste değil DİLBİLGİSİ DESENİ:
+    1) soru eki             : mı|mi|mu|mü|musun|mıydı...
+    2) soru sözcüğü + fiil  : (ne|kim|kaç|hangi...) + kelime + (dı|di|mış|yor...)
+    3) belirgin öbekler     : "ne zaman", "ne kadar", "kaç kişi"
+
+  Çekimli fiil eki zorunluluğu ünlem kalıplarını ayırır:
+    "ne açıklanDI" -> geçer    "ne güzel" -> geçmez
+  Desen kusursuz değil ("ne güzeldi" kaçar); kaçanları niyet modeli eler.
+
+  UNICODE TUZAĞI: desenlerde \b KULLANILMAZ. ASCII tabanlıdır, Türkçe
+  harflerde (ı, ş, ğ) sınır tutmaz. (?<!\p{L}) / (?!\p{L}) kullanılır.
 
 KANIT TOPLAMA (kendi içinde SERİ)
   1. yerel (Vectorize)  80 ms   bedava   -> bulunca web'e HİÇ gitme
@@ -19,32 +38,51 @@ KAYNAK YÖNLENDİRME (topic.js, regex belirler)
   semi   -> önce Vectorize, bayatsa web
   static -> model kendi bilir, web'e gitmez
 
-  seed.json = SEMI'nin veri tarafı. SEMI_INDICATOR listesi "bu konu semi"
-  der (isim), seed.json o konunun gerçek rakamını taşır (veri).
-  Liste olmadan konu static sayılır, static web'e gitmez -> bayat veri
-  güncellenemez. Bu yüzden liste kritik.
+  ÖZEL KURAL: gelecek zaman + takvim işareti -> ASLA static, FRESH.
+  "seçim ne zaman yapılacak" modelin eski verisinden cevaplanamaz.
 
-MALİYET (gerçek Cloudflare fiyatlarıyla, resmi docs)
+  seed.json = SEMI'nin veri tarafı. SEMI_INDICATOR "bu konu semi" der
+  (isim), seed.json rakamı taşır (veri). Liste olmadan konu static
+  sayılır, static web'e gitmez -> bayat veri güncellenemez.
+
+VECTORIZE EŞİĞİ — TÜRKÇE İÇİN ÖLÇÜMLE
+  MIN_SCORE = 0.48 (başta 0.62 idi, fazla katıydı)
+  Gerçek skorlar: doğru eşleşmeler 0.52-0.54, alakasızlar 0.38-0.41
+  Sonuç: p95 gecikme 2001 ms -> 397 ms (5 kat)
+
+CANLI ÖLÇÜM (deploy sonrası, gerçek)
+  p95 gecikme    : 397-847 ms (eşik 2500) -> VIABLE
+  niyet doğruluk : 13/13 örnek doğru
+  niyet süresi   : ~116 ms ortalama
+
+MALİYET (gerçek Cloudflare fiyatlarıyla)
   Ücretsiz kota: 10.000 nöron/gün (00:00 UTC sıfırlanır)
-  Gerçekçi kullanım (90 tetikleme/gün): ~280 nöron = %2.8 -> rahat sığar
-  Tek gerçek sınır: Brave arama kotası (~1000/ay), Vectorize çoğunu önlüyor
+  90 tetikleme/gün: ~280 nöron = %2.8 -> rahat sığar
+  Kapı genişledi, tetikleme artabilir: %9'a çıksa bile sorun yok
+  Tek gerçek sınır: Brave arama kotası (~1000/ay), Vectorize önlüyor
+
+TEŞHİS
+  cd worker && npx wrangler tail
+    [check] q="..." topic=semi wants=true by=model src=local totalMs=397
+    [evidence] yerel eşleşme yok -> web'e düşülüyor
+  (kök dizinden çalıştırma: "Worker name missing" hatası verir)
 
 DOKÜMANLAR
-  README.md          mimari, karar mantığı, gecikme, ürün kararları, TODO
-  SETUP.md           adım adım kurulum, her komutun gerekçesi, bakım notu
-  TRIGGER-LOGIC.md   neyi değerlendiriyoruz, neyi değerlendirmiyoruz
-  API.md             her uç, her alan, her değerin anlamı
-  DATA-LAYERS.md     KV ve Vectorize'ın kod düzeyinde açıklaması
+  README.md          mimari, cihaz kapısı, gecikme, maliyet, TODO
+  SETUP.md           adım adım kurulum, sorun giderme tablosu, bakım
+  TRIGGER-LOGIC.md   kapı neden genişletildi, soru deseni, üç aşama
+  API.md             her uç, her alan, canlı log izleme
+  DATA-LAYERS.md     KV + Vectorize, benzerlik eşiği ayarı
 
 DOĞRULAMA
-  cd worker && npm install && npm test   -> TÜM TESTLER GEÇTİ (72/72)
-  deploy sonrası: npm run test:intent    -> gerçek llama çağrısı, niyet testi
-  deploy sonrası: curl $WORKER/bench      -> p95 gecikme ölçümü (CRITICAL)
+  cd worker && npm install && npm test   -> 87/87
+  deploy sonrası: npm run test:intent    -> gerçek llama, 13 vaka
+  deploy sonrası: curl $WORKER/bench     -> p95 gecikme
 
-AÇIK İŞLER (README bölüm 7)
-  [ ] /bench ölçümü — gecikme rakamları hâlâ tahmin (en kritik)
+AÇIK İŞLER
+  [ ] Genişletilmiş kapının retorik sorulardaki doğruluğu ölçülmeli
+      ("ne güzeldi o günler" -> Llama HAYIR demeli)
   [ ] cron worker ile otomatik seed güncelleme
-  [ ] test:intent deploy sonrası
   [ ] Türkçe STT rakam doğruluğu canlıda
 
 SEED VERİLERİ (22 Temmuz 2026, web'den doğrulandı)

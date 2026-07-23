@@ -536,6 +536,11 @@ curl $WORKER/bench | python3 -m json.tool  # gecikme
 | `WORKER: unbound variable` | Değişken tanımsız | `export WORKER=https://...workers.dev` |
 | `Expecting value: line 1 column 1` | curl boş döndü | Üsttekinin sonucu; `WORKER` düzelince gider |
 | Cevaplar yavaş | Arama yavaş | `bench` çalıştır, gerekirse `SEARCH_PROVIDER = "none"` |
+| Telefon backend'e ulaşmıyor | APK'ya yanlış adres gömülü | Ayarlar → **Bağlantı** satırına bak; yanlışsa `-PworkerUrl=` ile yeniden derle |
+| `wrangler tail` → "Worker name missing" | Kök dizindesin | `cd worker` yap, ya da `npx wrangler tail mai` |
+| CI deploy → `Authentication error [code: 10000]` | `wrangler-action`'da `secrets:` bloğu var | Bloğu kaldır; secret'lar zaten Cloudflare'de. Token'a sadece **Workers Scripts: Edit** yeter |
+| Düz soru tetiklemiyor | Eski sözlük/APK | Sözlük 8+ olmalı (Ayarlar); Kotlin mantığı da değiştiği için APK'yı yeniden derle |
+| `semi` sorular hep web'e gidiyor | Benzerlik eşiği fazla katı | `/debug?q=` çıktısındaki `similarityScore`'lara bak, `MIN_SCORE`'u boşluğa ayarla (Türkçe için 0.48) |
 
 
 ---

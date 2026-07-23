@@ -16,7 +16,7 @@
  */
 
 import {
-  classifyTopic, precheckIntent, route, addTimeContext, buildQuery, hasHedge,
+  classifyTopic, precheckIntent, shouldTrigger, route, addTimeContext, buildQuery, hasHedge,
   TOPIC, PRECHECK,
 } from "../src/topic.js";
 
@@ -210,6 +210,22 @@ const SAFETY = [
    "Taze veri uzun saklanmamalı"],
   ["STATIC TTL uzun (>=1 gün)", () => route(TOPIC.STATIC).ttl >= 86400,
    "Çanakkale'nin yılı değişmeyecek"],
+  ["Isimle hitap + soru tetikler", () => shouldTrigger("Kenan bu olay ne oldu biliyor musun") === true,
+   "sunucu birine hitap ederek sorabilir"],
+  ["Desen: soru eki yakalanir", () => shouldTrigger("zam açıklandı mı") === true,
+   "mı eki — Unicode sinir sorunu duzeltildi"],
+  ["Desen: soru sozcugu + fiil", () => shouldTrigger("Kenan bey en son ne açıklandı") === true,
+   "listede yok, dilbilgisi deseni yakaliyor"],
+  ["Unlem kalibi tetiklemez", () => shouldTrigger("ne güzel bir gün") === false,
+   "ne + sifat, cekimli fiil yok"],
+  ["Dogrudan soru tereddutsuz tetikler", () => shouldTrigger("maçın sonucu ne oldu") === true,
+   "sunucu 'acaba' demeden de bilgi isteyebilir"],
+  ["Tereddut yine tetikler", () => shouldTrigger("enflasyon sanırım yüzde 35ti") === true,
+   "eski yol korunuyor"],
+  ["Duz konusma tetiklemez", () => shouldTrigger("bugün hava çok güzel efendim") === false,
+   "ne tereddüt ne soru"],
+  ["Konuyu kapatan tetiklemez", () => shouldTrigger("neyse konumuza dönelim") === false,
+   "hedgeIgnore her iki yolu da kapatır"],
   ["Saf gelecek tahmini elenir", () => precheckIntent("zam ne kadar olacak") === PRECHECK.SKIP,
    "tarih işareti yok -> saf tahmin -> skip"],
   ["Gelecek + tarih sorusu ELENMEZ", () => precheckIntent("seçim ne zaman yapılacak") === PRECHECK.ASK_MODEL,

@@ -109,15 +109,98 @@ sığıyor. Arama kotan sıkışırsa seri moda geç.
 
 ---
 
+# 2b. Kapı neden genişletildi — tereddüt tek başına yetmiyor
+
+İlk tasarımda cihaz kapısı SADECE tereddüt arıyordu ("sanırım", "emin
+değilim", "galiba"). Gerçek kullanımda bunun büyük bir açık olduğu görüldü:
+
+> "türkiyenin bir sonraki seçimi ne zaman"
+> "çanakkale boğazı ne zaman kuruldu"
+> "dün Fener'in maçı var mı"
+
+Bu cümlelerin hiçbirinde tereddüt sözcüğü yok — ama üçü de apaçık bilgi
+isteği. Uygulama hepsinde susuyordu.
+
+**Doğru zihinsel model:** MAI kulaklıktaki yapımcıdır. Yapımcı üç şey yapar:
+doğrudan soruya cevap verir, sunucu tereddüt edince kendiliğinden düzeltir,
+laf kalabalığında susar. Sadece tereddüt dinleyen bir yapımcı yarım
+yapımcıdır.
+
+Bu yüzden kapı artık **tereddüt VEYA doğrudan soru** ile açılıyor.
+
+## Soru nasıl tanınıyor — liste değil, dilbilgisi deseni
+
+Soru kalıplarını liste olarak tutmak bitmez: "ne açıklandı", "ne duyuruldu",
+"ne söylendi", "ne oldu"... sonsuz varyasyon. Bunun yerine Türkçenin soru
+kurma kuralı desene çevrildi:
+
+```
+1) Soru eki        : mı | mi | mu | mü | musun | mıydı ...
+                     "açıklandı MI", "biliyor MUSUN"
+
+2) Soru sözcüğü + çekimli fiil:
+   (ne|kim|kaç|hangi|nerede|nasıl|niye|neden) + kelime + (dı|di|mış|yor|...)
+                     "NE açıklanDI", "KİM duyurDU", "NE deDİ"
+
+3) Belirgin soru öbekleri : "ne zaman", "ne kadar", "kaç kişi"
+```
+
+İkinci desendeki **çekimli fiil eki zorunluluğu** ünlem kalıplarını ayırır:
+
+| Cümle | Eşleşir mi | Neden |
+|---|---|---|
+| "ne açıklandı" | ✓ | açıklan + **dı** |
+| "kim duyurdu" | ✓ | duyur + **du** |
+| "ne güzel" | ✗ | "güzel" fiil eki taşımıyor |
+| "ne yazık ki" | ✗ | "yazık" fiil eki taşımıyor |
+
+> **Unicode tuzağı:** Desenlerde `\b` KULLANILMAZ. JavaScript'te (ve
+> Kotlin'de) `\b` ASCII tabanlıdır; "açıklandı mı" içindeki "mı" sonundaki
+> "ı" ASCII olmadığı için sınır tutmaz ve desen kaçırır. Bunun yerine
+> `(?<!\p{L})` / `(?!\p{L})` Unicode ileri-geri bakışları kullanılır.
+> Aynı tuzak `-caktı` ekinde de yaşandı.
+
+## Desen kusursuz değil — ve olması gerekmiyor
+
+Ölçülen sınırlar:
+
+| Cümle | Desen | Olması gereken |
+|---|---|---|
+| "ne güzeldi o günler" | geçer | ünlem — kaçırıyor |
+| "ne oldu sana böyle" | geçer | endişe — kaçırıyor |
+| "ne yaptın sen böyle" | sessiz | ✓ doğru |
+| "kim bilir neler oldu" | sessiz | ✓ doğru |
+
+Bu tolere edilebilir çünkü desen **kesin karar vermiyor, sadece kapıyı
+açıyor.** Kaçanları sunucudaki niyet modeli eliyor. Mimarinin temel iş
+bölümü: ucuz regex geniş ağ atar, pahalı model süzer.
+
+## Bedeli ölçüldü
+
+Gerçekçi TV cümleleriyle: 9 cümlenin 7'si modele gidiyor (önce çoğu kapıda
+kalıyordu). Yani eleme yükü tamamen niyet modelinde. Maliyet açısından sorun
+yok — ölçülen kullanım ücretsiz kotanın %3'üydü, üç katına çıksa bile %9.
+Asıl risk ekran gürültüsü; onu niyet modelinin doğruluğu belirliyor.
+
+---
+
 # 3. Üç aşamalı karar
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ AŞAMA 1 — CİHAZDA (Android, ~0 ms, ağ turu yok)             │
-│   tereddüt ifadesi var mı?      -> yoksa DUR                │
-│   görüş bildirimi mi?           -> ise DUR                  │
-│   gelecek zaman eki var mı?     -> varsa DUR                │
-│   doğrulanabilir içerik var mı? -> yoksa DUR                │
+│   konuyu kapatıyor mu? ("neyse")   -> ise DUR               │
+│   görüş bildirimi mi? ("bence")    -> ise DUR               │
+│   gelecek zaman eki var mı?        -> varsa DUR             │
+│     AMA takvim işareti de varsa    -> DURMA (tarih sorusu)  │
+│                                                             │
+│   KAPI — ikisinden BİRİ yeterli:                            │
+│     a) tereddüt var mı? ("sanırım", "emin değilim")         │
+│     b) doğrudan soru mu? ("maçın sonucu ne oldu")           │
+│   ikisi de yoksa -> DUR                                     │
+│                                                             │
+│   sadece (a) geldiyse: doğrulanabilir içerik de ara         │
+│   (b) geldiyse: soru zaten güçlü sinyal, ek şart yok        │
 └────────────────────────┬────────────────────────────────────┘
                          │ geçenler Worker'a gider
 ┌────────────────────────▼────────────────────────────────────┐
