@@ -54,6 +54,9 @@ const TOPIC_CASES = [
   ["2026 bütçesi neydi", "semi", "yakın yıl"],
 
   // STATIC — değişmeyen
+  ["seçim ne zaman yapılacak", "fresh", "gelecek+takvim -> web zorunlu, model tek başına YASAK"],
+  ["maç saat kaçta başlayacak", "fresh", "program sorusu -> taze"],
+  ["Lozan ne zaman imzalandı", "static", "geçmiş, gelecek eki yok -> model bilir"],
   ["Çanakkale Savaşı hangi yıldı", "static", "tarihsel"],
   ["suyun kaynama noktası neydi", "static", "bilimsel sabit"],
   ["Türkiye'nin en yüksek dağı neydi", "static", "coğrafi sabit"],
@@ -101,11 +104,14 @@ const INTENT_CASES = [
   ["boş ver şimdi", "skip", "yok sayılan kalıp"],
 
   // Gelecek zaman fiil eki — henüz olmamış, doğrulanamaz
-  ["grev ne zaman bitecek", "skip", "-ecek eki"],
+  ["grev ne zaman bitecek", "ask", "-ecek eki AMA 'ne zaman' var -> tarih olabilir, modele"],
   ["zam gelecek mi", "skip", "-ecek eki"],
   ["yarın ne olacak", "skip", "-acak eki"],
   ["bu davanın sonucu ne olacak", "skip", "-acak eki"],
-  ["açıklanacak mı acaba", "skip", "-acak eki"],
+  ["zam ne kadar olacak", "skip", "-acak eki, saf tahmin -> skip"],
+  ["kim kazanacak acaba", "skip", "-acak eki, saf tahmin -> skip"],
+  ["seçim ne zaman yapılacak", "ask", "-acak + 'ne zaman' -> tarih sorusu, modele"],
+  ["maç saat kaçta başlayacak", "ask", "-acak + program -> modele"],
   ["hep birlikte göreceğiz", "skip", "-eceğ eki"],
 
   // MODELE SORULMALI — regex karar veremez
@@ -204,8 +210,10 @@ const SAFETY = [
    "Taze veri uzun saklanmamalı"],
   ["STATIC TTL uzun (>=1 gün)", () => route(TOPIC.STATIC).ttl >= 86400,
    "Çanakkale'nin yılı değişmeyecek"],
-  ["Gelecek zaman eki her zaman elenir", () => precheckIntent("bu iş ne zaman bitecek") === PRECHECK.SKIP,
-   "Olmamış bir şey doğrulanamaz"],
+  ["Saf gelecek tahmini elenir", () => precheckIntent("zam ne kadar olacak") === PRECHECK.SKIP,
+   "tarih işareti yok -> saf tahmin -> skip"],
+  ["Gelecek + tarih sorusu ELENMEZ", () => precheckIntent("seçim ne zaman yapılacak") === PRECHECK.ASK_MODEL,
+   "takvim sorusu cevaplanabilir -> model karar versin, regex susmasın"],
   ["Hitaplı soru modele gider", () => precheckIntent("Veysel bu ne oldu") === PRECHECK.ASK_MODEL,
    "Regex hitabı değerlendiremez, model değerlendirmeli"],
 ];
