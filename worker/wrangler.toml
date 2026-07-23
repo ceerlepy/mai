@@ -44,3 +44,12 @@ index_name = "mai"
 
 [observability]
 enabled = true
+
+# invocation_logs: her istek için otomatik bir satır (yol, durum, süre).
+# Kod içindeki console.log çıktıları da buraya akar.
+# Canlı izlemek için:  cd worker && npx wrangler tail
+# (kök dizinden çalıştırırsan "Worker name missing" hatası alırsın,
+#  çünkü wrangler.toml worker/ içinde. Alternatif: npx wrangler tail mai)
+[observability.logs]
+enabled = true
+invocation_logs = true

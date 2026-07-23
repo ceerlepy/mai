@@ -32,6 +32,11 @@ object T {
     val Wave      = Color(0xFF818CF8)   // tereddüt yakalandı, cevap aranıyor
     val Warn      = Color(0xFFFBBF24)   // emin değilim
     val Web       = Color(0xFF60A5FA)   // web kaynaklı
+
+    // Amblem renkleri — uygulama ikonuyla (ic_launcher_foreground) AYNI.
+    // Değiştirirsen ikonu da güncelle, yoksa marka tutarlılığı bozulur.
+    val LogoText  = Color(0xFF7DD3FC)   // "M" ve "AI" harfleri
+    val LogoDot   = Color(0xFF38BDF8)   // ortadaki "·" ve alt vurgu
 }
 
 private val MaiType = Typography(

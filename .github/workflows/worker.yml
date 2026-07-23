@@ -16,13 +16,21 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Testler
+        working-directory: worker
+        run: node test/topic.test.mjs
+
+      # NOT: Secret'lar (BRAVE_KEY, INGEST_TOKEN) BİLEREK burada yüklenmiyor.
+      # Onlar bir kez `npx wrangler secret put ...` ile elle girilir ve
+      # Cloudflare'de kalıcı durur; deploy onları silmez.
+      #
+      # wrangler-action'a `secrets:` bloğu eklersen `wrangler secret put`
+      # çalışır, o da /memberships API'sine gider ve dar yetkili bir
+      # API token'da "Authentication error [code: 10000]" verir.
+      # Deploy için gereken tek yetki: Workers Scripts: Edit.
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          secrets: |
-            BRAVE_KEY
-        env:
-          BRAVE_KEY: ${{ secrets.BRAVE_KEY }}

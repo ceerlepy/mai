@@ -141,6 +141,20 @@ function stream(q, context, env, ctx) {
     w.write(enc.encode(`event: ${ev}\ndata: ${JSON.stringify(d)}\n\n`)).catch(() => {});
 
   const finish = async (payload) => {
+    // Tek satırlık teşhis logu — `npx wrangler tail` ile canlı izlenir.
+    // Her istek için: soru, konu sınıfı, niyet kararı, kaynak, süre.
+    // Kaynak "no-request" ise ekrana hiçbir şey basılmadı demektir.
+    // Soruyu 80 karakterle sınırlıyoruz; log satırı okunabilir kalsın.
+    console.log(
+      `[check] q="${String(q).slice(0, 80)}" ` +
+      `topic=${payload.topicClass} ` +
+      `wants=${payload.speakerWantsInfo} ` +
+      `by=${payload.intentCheckedBy} ` +
+      `src=${payload.source} ` +
+      `intentMs=${payload.intentLatencyMs ?? "-"} ` +
+      `totalMs=${payload.latencyMs}` +
+      (payload.sources?.length ? ` refs=${payload.sources.length}` : "")
+    );
     await send("answer", payload);
     await send("done", { latencyMs: ms() });
     return w.close().catch(() => {});
@@ -295,9 +309,19 @@ async function gatherEvidence(env, q, context, topic, plan) {
   // değişen rakamları tutuyor. Bulursa web'e HİÇ gitmiyoruz: ne gecikme,
   // ne arama ücreti.
   if (plan.local) {
-    const local = await lookupLocal(env, q).catch(() => null);
+    const local = await lookupLocal(env, q).catch((e) => {
+      // Sessizce yutmuyoruz: Vectorize bağlanamadıysa/hata verdiyse
+      // görünsün, yoksa "neden hep web'e düşüyor" diye aranır.
+      console.error(`[evidence] vectorize hata: ${e?.message || e}`);
+      return null;
+    });
     if (local && !isStale(local.fresh, local.maxDays)) {
       return { ...local, src: "local" };
+    }
+    if (local) {
+      console.log(`[evidence] yerel kayıt BAYAT (maxDays=${local.maxDays}) -> web'e düşülüyor`);
+    } else {
+      console.log(`[evidence] yerel eşleşme yok -> web'e düşülüyor`);
     }
     // Yerelde yok veya bayat -> web'e düş (aşağıda)
   }
@@ -308,10 +332,16 @@ async function gatherEvidence(env, q, context, topic, plan) {
   // (boşa ücret). Seri: yerel varsa web hiç başlamaz.
   if (plan.web) {
     const qq = addTimeContext(buildQuery(q, context), topic);
-    const web = await search(env, qq).catch(() => null);
+    const web = await search(env, qq).catch((e) => {
+      console.error(`[evidence] web arama hata: ${e?.message || e}`);
+      return null;
+    });
     if (web) return { ...web, src: "web" };
+    console.log(`[evidence] web sonuç döndürmedi: "${qq}"`);
   }
 
+  // Hiçbir kaynak bulunamadı. plan.modelOK false ise cevap verilmeyecek.
+  console.log(`[evidence] kanıt YOK (local=${plan.local} web=${plan.web} modelOK=${plan.modelOK})`);
   return null;
 }
 

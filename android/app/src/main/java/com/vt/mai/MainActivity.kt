@@ -16,6 +16,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -32,6 +34,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -199,8 +204,10 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun TopBar(live: Boolean, onMenu: () -> Unit) {
-        TopAppBar(
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = T.Bg),
+        // CenterAlignedTopAppBar: başlık, sol menü ikonundan bağımsız olarak
+        // ekranın TAM ORTASINDA durur. Düz TopAppBar başlığı sola yaslar.
+        CenterAlignedTopAppBar(
+            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = T.Bg),
             navigationIcon = {
                 IconButton(onMenu) {
                     Icon(Icons.Rounded.Menu, "geçmiş", tint = T.TextDim)
@@ -222,8 +229,18 @@ class MainActivity : ComponentActivity() {
                         Text("CANLI", color = T.Live, fontSize = 13.sp,
                             fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
                     } else {
-                        Text("MAI", color = T.Text, fontSize = 17.sp,
-                            fontWeight = FontWeight.SemiBold)
+                        // Amblemle birebir aynı: açık mavi "M·AI",
+                        // ortadaki nokta bir ton koyu (ic_launcher ile aynı renkler).
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(color = T.LogoText)) { append("M") }
+                                withStyle(SpanStyle(color = T.LogoDot))  { append("·") }
+                                withStyle(SpanStyle(color = T.LogoText)) { append("AI") }
+                            },
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
                     }
                 }
             }
@@ -527,7 +544,14 @@ class MainActivity : ComponentActivity() {
             containerColor = T.Surface,
             dragHandle = { BottomSheetDefaults.DragHandle(color = T.Line) }
         ) {
-            Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 34.dp)) {
+            // verticalScroll: içerik ekrana sığmazsa kaydırılabilsin.
+            // Bu olmadan alttaki "sunucu:" satırı küçük ekranlarda kırpılıyordu.
+            Column(
+                Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 34.dp)
+            ) {
                 Text("Ayarlar", color = T.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(22.dp))
 
@@ -546,14 +570,26 @@ class MainActivity : ComponentActivity() {
                     Text("Tüm geçmişi sil", color = T.Live, fontSize = 14.sp)
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(14.dp))
+                HorizontalDivider(color = T.Line)
+                Spacer(Modifier.height(12.dp))
+
+                // Bağlanılan Worker adresi. Uygulama beklendiği gibi
+                // çalışmıyorsa ilk bakılacak yer burası: adres yanlışsa
+                // (ör. placeholder mai.workers.dev) istekler boşa gider.
+                // Bu adres APK derlenirken gömülür (-PworkerUrl), sonradan
+                // değiştirilemez — değiştirmek için yeniden derlemek gerekir.
+                Text("Bağlantı", color = T.TextDim, fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    "sunucu: ${BuildConfig.WORKER_URL}",
-                    color = T.TextFaint, fontSize = 10.sp
+                    BuildConfig.WORKER_URL,
+                    color = T.LogoText, fontSize = 12.sp
                 )
+                Spacer(Modifier.height(4.dp))
                 Text(
                     "sözlük sürümü: ${HedgeDetector.lexiconVersion()}",
-                    color = T.TextFaint, fontSize = 10.sp
+                    color = T.TextFaint, fontSize = 11.sp
                 )
             }
         }

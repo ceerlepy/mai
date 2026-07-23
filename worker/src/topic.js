@@ -113,6 +113,17 @@ export function classifyTopic(text) {
     if (has(t, FRESH_EVENT)) return TOPIC.FRESH;
     // Gelecek zaman ifadesi + fiil eki yoksa takvim sorusu ("yarın maç kaçta")
     if (has(t, TIME_FUTURE)) return TOPIC.FRESH;
+
+    // GELECEK ZAMANLI TAKVİM SORUSU ASLA STATIC OLAMAZ.
+    //   "seçim ne zaman yapılacak"  -> açıklanmış/değişebilen tarih
+    //   "maç saat kaçta başlayacak" -> güncel program
+    // Bunlar modelin eğitim verisinde eski haliyle durur ve model onu
+    // güvenle söyler. Static olsalardı web'e hiç gidilmez, bayat tarih
+    // ekrana çıkardı. Fresh yaparak web'i ZORUNLU kılıyoruz.
+    //
+    // "Lozan ne zaman imzalandı" bundan etkilenmez: gelecek zaman eki yok,
+    // sadece SCHEDULE_MARKER var -> aşağıya düşer, static kalır (doğru).
+    if (FUTURE_TENSE.test(t) && has(t, SCHEDULE_MARKER)) return TOPIC.FRESH;
   }
 
   if (isEra) return TOPIC.STATIC;
