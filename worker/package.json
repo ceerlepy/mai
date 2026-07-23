@@ -1,13 +1,13 @@
 {
-  "name": "teyit-worker",
+  "name": "mai-worker",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
-    "test": "node test/router.test.mjs",
-    "test:triage": "./test/triage.test.sh"
+    "test": "node test/topic.test.mjs",
+    "test:intent": "./test/intent.test.sh"
   },
   "devDependencies": {
     "wrangler": "^3.90.0"

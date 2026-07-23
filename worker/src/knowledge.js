@@ -18,7 +18,17 @@
  */
 
 const EMBED_MODEL = "@cf/baai/bge-m3";   // çok dilli, Türkçe destekli
-const MIN_SCORE = 0.62;                   // altı güvenilmez -> web'e düş
+// Kosinüs benzerliği eşiği. Altındakiler güvenilmez sayılıp web'e düşülür.
+//
+// 0.48 Türkçe kısa sorular için gerçek ölçümle ayarlandı. 0.62 (varsayılan)
+// fazla katıydı: "enflasyon kacti" ↔ "Yıllık tüketici enflasyonu" gerçek
+// eşleşmesi 0.526 skor veriyordu ama 0.62'yi geçemeyip web'e düşüyordu.
+//
+// bge-m3 çok dilli; Türkçe kısa soru + kısa başlık çiftlerinde skorlar
+// doğal olarak 0.45-0.55 bandında oturuyor. İngilizce uzun metinlerdeki
+// 0.62+ skorlar Türkçe'de nadir. Ölçüm: /debug?q= çıktısındaki
+// similarityScore değerlerine bakarak ayarla.
+const MIN_SCORE = 0.48;
 
 /**
  * Yerel bilgi tabanında ara.
@@ -50,6 +60,8 @@ export async function lookupLocal(env, query) {
       })),
       score: hits[0].score,
       fresh: hits[0].metadata?.updated || null,
+      // Her kaydın kendi tazelik ömrü olabilir (aşağıya bak)
+      maxDays: Number(hits[0].metadata?.maxDays) || null,
     };
   } catch {
     return null;
@@ -62,7 +74,7 @@ export async function lookupLocal(env, query) {
  * Korumalı: INGEST_TOKEN gerekir.
  */
 export async function ingest(env, items) {
-  if (!env.VEC) return { ok: false, error: "Vectorize bağlı değil" };
+  if (!env.VEC) return { ok: false, error: "Vectorize not bound" };
 
   const texts = items.map((x) => `${x.title}. ${x.text}`);
   const emb = await env.AI.run(EMBED_MODEL, { text: texts });
@@ -75,6 +87,11 @@ export async function ingest(env, items) {
       text: String(x.text || "").slice(0, 900),
       source: String(x.source || ""),
       updated: String(x.updated || new Date().toISOString().slice(0, 10)),
+      // Kaydın kaç gün sonra bayat sayılacağı. Verilmezse 45.
+      // Aylık açıklanan veriler (enflasyon, işsizlik) için 45 uygun.
+      // Yıllık açıklananlar (nüfus) için 400 vermek gerekir, yoksa
+      // her ay boşuna web aramasına düşer.
+      maxDays: Number(x.maxDays) || 45,
     },
   }));
 
@@ -83,12 +100,63 @@ export async function ingest(env, items) {
 }
 
 /**
- * Bir kaydın ne kadar taze olduğunu kontrol eder.
- * Eski veri, güncel soruya yanlış cevap vermekten kötüdür.
+ * TEŞHİS: eşik uygulamadan ham sonuçları döner.
+ * MIN_SCORE'un doğru ayarlanıp ayarlanmadığını görmek için.
  */
-export function isStale(updated, maxDays = 45) {
+export async function debugQuery(env, query) {
+  if (!env.VEC) return { error: "Vectorize not bound (env.VEC missing)" };
+  try {
+    const t0 = Date.now();
+    const emb = await env.AI.run(EMBED_MODEL, { text: [query] });
+    const embMs = Date.now() - t0;
+
+    const t1 = Date.now();
+    const res = await env.VEC.query(emb.data[0], { topK: 5, returnMetadata: "all" });
+    const queryMs = Date.now() - t1;
+
+    const matches = (res.matches || []).map((m) => ({
+      recordId: m.id,
+      similarityScore: Number(m.score?.toFixed(4)),   // 1.0 = aynı anlam, 0 = ilgisiz
+      passesThreshold: m.score >= MIN_SCORE,          // false ise bu kayıt kullanılmaz
+      title: m.metadata?.title,
+      lastUpdated: m.metadata?.updated,
+      maxAgeDays: m.metadata?.maxDays,                // bu kaydın tazelik ömrü
+      isStale: isStale(m.metadata?.updated, m.metadata?.maxDays),
+      usable: m.score >= MIN_SCORE && !isStale(m.metadata?.updated, m.metadata?.maxDays),
+    }));
+
+    return {
+      embeddedText: query,
+      similarityThreshold: MIN_SCORE,
+      embeddingMs: embMs,          // soruyu vektöre çevirme süresi
+      vectorSearchMs: queryMs,     // index'te arama süresi
+      totalMatches: matches.length,
+      usableMatches: matches.filter((m) => m.usable).length,   // 0 ise web'e düşülür
+      matches,
+    };
+  } catch (e) {
+    return { error: String(e?.message || e) };
+  }
+}
+
+/**
+ * Bir kaydın bayatlayıp bayatlamadığını kontrol eder.
+ *
+ * Bayat veri, canlı yayında yanlış cevap demektir — o yüzden bayatsa
+ * kayıt kullanılmaz, soru otomatik web aramasına düşer.
+ *
+ * Ömür kaydın kendisinde tanımlı (metadata.maxDays):
+ *   enflasyon, işsizlik, faiz  -> aylık açıklanır  ->  45 gün
+ *   asgari ücret               -> yıllık/6 aylık   -> 200 gün
+ *   nüfus                      -> yıllık           -> 400 gün
+ *
+ * @param {string} updated  ISO tarih ("2026-07-03")
+ * @param {number} maxDays  kaydın kendi ömrü; yoksa varsayılan 45
+ */
+export function isStale(updated, maxDays) {
   if (!updated) return true;
   const d = Date.parse(updated);
   if (isNaN(d)) return true;
-  return (Date.now() - d) / 86400000 > maxDays;
+  const limit = Number(maxDays) || 45;
+  return (Date.now() - d) / 86400000 > limit;
 }

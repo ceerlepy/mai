@@ -1,39 +1,69 @@
 {
+  "_aciklama": "Yerel bilgi tabanı. Bu dosyadaki veriler 22 Temmuz 2026 itibarıyla günceldir. Her ay TÜİK/TCMB açıklamalarından sonra güncelle ve ./scripts/ingest.sh ile tekrar yükle. Güncel kalmazsa isStale() devreye girer ve soru otomatik web aramasına düşer — yanlış cevap verilmez, sadece yavaşlar.",
   "items": [
     {
-      "id": "tuik-enflasyon",
+      "id": "tufe-yillik",
       "title": "Yıllık tüketici enflasyonu (TÜFE)",
-      "text": "GÜNCELLE: TÜİK'in açıkladığı son yıllık TÜFE oranını ve ait olduğu ayı buraya yaz. Örn: 'Haziran 2026 itibarıyla yıllık TÜFE yüzde XX,X.'",
+      "text": "Haziran 2026 itibarıyla yıllık TÜFE yüzde 32,11. Aylık artış yüzde 0,99. Yıllık enflasyon bir önceki aya kıyasla 0,50 puan azaldı. Çekirdek enflasyon (C endeksi) yıllık yüzde 29,84. Yİ-ÜFE yıllık yüzde 28,09, aylık yüzde 1,80.",
       "source": "https://data.tuik.gov.tr",
-      "updated": "2026-07-01"
+      "updated": "2026-07-03",
+      "maxDays": 45
+    },
+    {
+      "id": "tufe-gruplar",
+      "title": "Enflasyonun alt kalemleri",
+      "text": "Haziran 2026 yıllık değişimler: gıda ve alkolsüz içecekler yüzde 35,45 artış, ulaştırma yüzde 21,15 artış, konut-su-elektrik-gaz yüzde 45,14 artış. Hizmet grubu yıllık yüzde 39,64, temel mallar yüzde 17,37. Enerji fiyatları yıllık yüzde 24,93 arttı.",
+      "source": "https://www.sbb.gov.tr/enflasyon/",
+      "updated": "2026-07-03",
+      "maxDays": 45
     },
     {
       "id": "asgari-ucret",
-      "title": "Asgari ücret",
-      "text": "GÜNCELLE: Yürürlükteki net ve brüt asgari ücreti ve geçerli olduğu dönemi yaz.",
+      "title": "Asgari ücret 2026",
+      "text": "2026 yılı asgari ücreti brüt 33.030 TL, net 28.075,50 TL. 1 Ocak 2026'da yürürlüğe girdi ve yıl boyunca geçerli; Temmuz'da ara zam yapılmadı. Günlük brüt 1.101 TL, saatlik brüt 146,80 TL. İşverene aylık maliyeti 40.874,63 TL. SGK işçi payı 4.624,20 TL, işsizlik sigortası işçi payı 330,30 TL.",
       "source": "https://www.csgb.gov.tr",
-      "updated": "2026-07-01"
+      "updated": "2026-07-01",
+      "maxDays": 200
     },
     {
       "id": "nufus",
       "title": "Türkiye nüfusu",
-      "text": "GÜNCELLE: TÜİK ADNKS son nüfus sayısını ve yılını yaz.",
+      "text": "TÜİK ADNKS sonuçlarına göre Türkiye nüfusu 31 Aralık 2025 itibarıyla 86.092.168 kişi. Bir önceki yıla göre 427.224 kişi arttı. Erkek nüfus 43.059.434, kadın nüfus 43.032.734. Kilometrekareye 112 kişi düşüyor; İstanbul'da 2.943 kişi ile en yüksek, Tunceli'de en düşük.",
       "source": "https://data.tuik.gov.tr",
-      "updated": "2026-07-01"
+      "updated": "2026-02-06",
+      "maxDays": 400
     },
     {
       "id": "politika-faizi",
       "title": "TCMB politika faizi",
-      "text": "GÜNCELLE: Merkez Bankası'nın yürürlükteki politika faiz oranını ve karar tarihini yaz.",
+      "text": "TCMB politika faizi (bir hafta vadeli repo ihale faiz oranı) yüzde 37. Haziran 2026 PPK toplantısında sabit bırakıldı. Gecelik borç verme faizi yüzde 40, gecelik borçlanma faizi yüzde 35,5. Ocak 2026'da yüzde 38'den yüzde 37'ye indirilmişti; o tarihten beri indirim yapılmadı. TCMB Başkanı Fatih Karahan.",
       "source": "https://www.tcmb.gov.tr",
-      "updated": "2026-07-01"
+      "updated": "2026-06-11",
+      "maxDays": 60
     },
     {
       "id": "issizlik",
       "title": "İşsizlik oranı",
-      "text": "GÜNCELLE: TÜİK'in açıkladığı son işsizlik oranını, ayını ve mevsim düzeltmesi durumunu yaz.",
+      "text": "Mayıs 2026 itibarıyla mevsim etkisinden arındırılmış işsizlik oranı yüzde 8,2, bir önceki aya göre değişmedi. İşsiz sayısı 2.883.000 kişi. Erkeklerde yüzde 7,0, kadınlarda yüzde 10,5. Genç nüfusta (15-24 yaş) işsizlik yüzde 14,8. Mevsim etkilerinden arındırılmamış oran yüzde 7,4.",
       "source": "https://data.tuik.gov.tr",
-      "updated": "2026-07-01"
+      "updated": "2026-06-30",
+      "maxDays": 45
+    },
+    {
+      "id": "istihdam",
+      "title": "İstihdam ve işgücü",
+      "text": "Mayıs 2026 itibarıyla istihdam edilen sayısı 32.463.000 kişi, istihdam oranı yüzde 48,5. İşgücü 35.345.000 kişi, işgücüne katılım oranı yüzde 52,8. Atıl işgücü oranı yüzde 31,0. Haftalık ortalama fiili çalışma süresi 42,4 saat.",
+      "source": "https://www.sbb.gov.tr/istihdam/",
+      "updated": "2026-06-30",
+      "maxDays": 45
+    },
+    {
+      "id": "memur-emekli-zam",
+      "title": "Temmuz 2026 memur ve emekli zammı",
+      "text": "Temmuz 2026 döneminde memur ve memur emeklisi zam oranı yüzde 13,52, SSK ve Bağ-Kur emeklilerinin zam oranı yüzde 17,76 olarak belirlendi. Oranlar Haziran 2026 enflasyon verisi açıklandıktan sonra kesinleşti.",
+      "source": "https://www.sgk.gov.tr",
+      "updated": "2026-07-03",
+      "maxDays": 200
     }
   ]
 }

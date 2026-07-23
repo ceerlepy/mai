@@ -1,3 +1,3 @@
--keep class com.vt.teyit.** { *; }
+-keep class com.vt.mai.** { *; }
 -dontwarn okhttp3.**
 -dontwarn okio.**

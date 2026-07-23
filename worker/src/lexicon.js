@@ -1,279 +1,270 @@
 /**
- * SÖZLÜK — tüm kelime listelerinin TEK kaynağı.
+ * SÖZLÜK — sadece NESNEL sinyaller.
  *
- * Buradan yönetilir:
- *   - router.js       sınıflandırma için okur
- *   - GET /lexicon    Android uygulaması açılışta çeker
+ * TASARIM İLKESİ
+ * Bu dosyada yalnızca cümle hakkında **olgusal** olan şeyler durur:
+ * hangi zaman ifadesi geçiyor, hangi konu adı geçiyor, fiil hangi kipte.
+ * Bunlar tartışmaya açık değildir ve liste büyümez.
  *
- * Android uygulaması bu listeyi Worker'dan indirdiği için, kelime eklemek
- * için APK yeniden derlemeye GEREK YOK. Deploy et, uygulama bir sonraki
- * açılışta yeni listeyi alır. VERSION'u artırmayı unutma.
+ * NİYET BURADA DEĞİL
+ * "Konuşmacı bilgi istiyor mu?" sorusu bağlama bağlıdır ve liste ile
+ * çözülemez. Denedik; liste sürekli büyüdü, yine de açık kaldı:
+ *
+ *   "asgari ücret ne oldu bilmiyorum"      -> istek değil
+ *   "arkadaşlar asgari ücret ne oldu"      -> istek
+ *   "bu bilmem kimin olayı en son ne oldu" -> istek (dolaylı)
+ *
+ * Üçünde de aynı kelimeler var; ayıran şey yönlendirme ve ton.
+ * Bu karar intent.js'te modele bırakıldı. Sonuç: bu dosya %60 küçüldü,
+ * bakım yükü kalktı, doğruluk arttı.
+ *
+ * Buraya yeni bir liste eklemeden önce sor: bu nesnel bir olgu mu, yoksa
+ * niyet tahmini mi? İkincisiyse modele ait.
  */
 
-export const VERSION = 3;
+export const VERSION = 7;
 
 /* ================================================================== */
-/* 1. TEREDDÜT (HEDGE) — uygulamanın tetiklenme koşulu                 */
+/* 1. TEREDDÜT — uygulamanın tetiklenme kapısı                         */
 /* ================================================================== */
 
 /**
- * Yayıncıların gerçekte kullandığı ifadeler. Kategorilere ayrıldı ki
- * hangisinin çok/az tetiklediğini logdan görüp ayarlayabilesin.
+ * Cihazda çalışır. Bunlardan biri geçmiyorsa hiçbir şey olmaz.
+ *
+ * NESNEL Mİ? Evet — bunlar konuşma dilinde belirsizlik bildiren kalıplar,
+ * niyet tahmini değil. Konuşmacı "sanırım" diyorsa emin değildir, nokta.
+ * Bilgi isteyip istemediği ayrı soru (intent.js).
  */
-export const HEDGE = {
-  // Klasik belirsizlik
-  belirsizlik: [
-    "sanırım", "sanıyorum", "galiba", "zannedersem", "zannediyorum",
-    "herhalde", "yanılmıyorsam", "yanlış hatırlamıyorsam", "yanlış bilmiyorsam",
-    "emin değilim", "emin olamadım", "tam emin değilim", "kesin değil",
-    "büyük ihtimalle", "muhtemelen öyle",
-  ],
-
-  // Hafıza / hatırlama — yayıncılarda çok sık
-  hafiza: [
-    "hatırladığım kadarıyla", "aklımda kaldığı kadarıyla", "tam hatırlamıyorum",
-    "şimdi hatırlayamadım", "aklıma gelmiyor", "dilimin ucunda",
-    "hafızam beni yanıltmıyorsa", "unuttum şimdi", "ismini unuttum",
-    "adı neydi", "aklımdan çıktı",
-  ],
-
-  // Doğrudan soru kalıpları
-  soru: [
-    "neydi", "kaçtı", "ne kadardı", "kaç yılında", "hangi yıldı",
-    "ne zamandı", "kim demişti", "kim söylemişti", "nerede olmuştu",
-    "kaç kişiydi", "ne oranda", "yüzde kaç",
-  ],
-
-  // Onay arama — "değil mi" tipi
-  onay: [
-    "değil miydi", "öyle miydi", "doğru mu", "yanlış mıyım",
-    "doğru mu söylüyorum", "yanlış mı biliyorum", "öyle değil mi",
-    "yanılıyor muyum", "bir yanlışım var mı",
-  ],
-
-  // Yayıncıya özgü — teyit isteme, düzeltme çağrısı
-  yayinci: [
-    "teyit edelim", "kontrol edelim", "bir bakalım", "araştıralım",
-    "not düşelim", "düzeltme yapayım", "izleyicilerimiz düzeltsin",
-    "bir saniye", "dur bakalım", "şöyle diyeyim", "diye biliyorum",
-    "gibi bir şeydi", "gibi hatırlıyorum", "öyle bir rakam",
-  ],
-};
-
-/** Tereddüt olsa da tetiklememesi gerekenler. */
-export const HEDGE_IGNORE = [
-  "sanırım öyle", "bilmiyorum ki", "her neyse", "neyse",
-  "bilmiyorum artık", "emin değilim ama olsun", "neyse boş ver",
-  "doğru mu ya", "hadi canım",
+export const HEDGE = [
+  // belirsizlik
+  "sanırım", "sanıyorum", "galiba", "zannedersem", "zannediyorum",
+  "herhalde", "yanılmıyorsam", "yanlış hatırlamıyorsam", "yanlış bilmiyorsam",
+  "emin değilim", "emin olamadım", "tam emin değilim", "kesin değil",
+  // hafıza
+  "hatırladığım kadarıyla", "aklımda kaldığı kadarıyla", "tam hatırlamıyorum",
+  "şimdi hatırlayamadım", "aklıma gelmiyor", "dilimin ucunda",
+  "hafızam beni yanıltmıyorsa", "ismini unuttum", "aklımdan çıktı",
+  // soru kalıpları
+  "neydi", "kaçtı", "ne kadardı", "kaç yılında", "hangi yıldı",
+  "ne zamandı", "kim demişti", "kim söylemişti", "ne oldu", "ne olmuş",
+  "kaç kişiydi", "yüzde kaç", "ne kadar",
+  // onay arama
+  "değil miydi", "öyle miydi", "doğru mu", "yanlış mıyım",
+  "doğru mu söylüyorum", "yanılıyor muyum", "öyle değil mi",
+  // yayıncı refleksleri
+  "teyit edelim", "kontrol edelim", "bir bakalım", "araştıralım",
+  "diye biliyorum", "gibi bir şeydi", "gibi hatırlıyorum",
 ];
 
-/** Düz liste (router ve Android bunu kullanır). */
-export const HEDGE_ALL = Object.values(HEDGE).flat();
+/** Tereddüt kelimesi geçse de kesinlikle tetiklememesi gerekenler. */
+export const HEDGE_IGNORE = [
+  "neyse", "her neyse", "boş ver", "hadi canım", "bilmiyorum ki",
+  "sanırım öyle", "neyse konumuza",
+];
 
 /* ================================================================== */
-/* 2. ZAMAN — tazelik tespiti                                          */
+/* 2. ZAMAN — nesnel, tazelik göstergesi                               */
 /* ================================================================== */
 
 /**
- * GEÇMİŞ zaman ifadeleri -> doğrulanabilir, web'e gidilir.
- * Yakından uzağa sıralı; ilk eşleşen kazanır (addTimeContext için önemli).
+ * Geçmiş zaman ifadeleri. `gun` alanı arama sorgusuna tarih eklemek için.
+ * Yakından uzağa sıralı — ilk eşleşen kazanır.
+ *
+ * NESNEL Mİ? Evet — "dün" kelimesi geçen bir cümle dünü kastediyordur.
+ */
+/**
+ * BU LİSTE KONU BELİRLER, NİYET BELİRLEMEZ.
+ * "dün" geçen bir cümle güncel bir konudan bahsediyordur — bu kesindir.
+ * Ama konuşmacının soru sorduğu anlamına GELMEZ.
  */
 export const TIME_PAST = [
-  // Bugün içi
   { k: "az önce", gun: 0 }, { k: "biraz önce", gun: 0 }, { k: "az evvel", gun: 0 },
-  { k: "demin", gun: 0 }, { k: "birazdan önce", gun: 0 },
-  { k: "bu sabah", gun: 0 }, { k: "bu öğlen", gun: 0 }, { k: "bu akşam", gun: 0 },
-  { k: "bugün", gun: 0 }, { k: "bugünkü", gun: 0 }, { k: "son dakika", gun: 0 },
-  { k: "şu an", gun: 0 }, { k: "şimdi", gun: 0 },
+  { k: "demin", gun: 0 }, { k: "bu sabah", gun: 0 }, { k: "bu öğlen", gun: 0 },
+  { k: "bu akşam", gun: 0 }, { k: "bugün", gun: 0 }, { k: "bugünkü", gun: 0 },
+  { k: "son dakika", gun: 0 }, { k: "şu an", gun: 0 },
 
-  // Dün
   { k: "dün akşam", gun: 1 }, { k: "dün gece", gun: 1 }, { k: "dün sabah", gun: 1 },
-  { k: "dün öğlen", gun: 1 }, { k: "dünkü", gun: 1 }, { k: "dün", gun: 1 },
-  { k: "geçen gece", gun: 1 },
+  { k: "dünkü", gun: 1 }, { k: "dün", gun: 1 }, { k: "geçen gece", gun: 1 },
 
-  // Birkaç gün
   { k: "evvelsi gün", gun: 2 }, { k: "önceki gün", gun: 2 },
   { k: "geçen gün", gun: 3 }, { k: "hafta sonu", gun: 3 },
-  { k: "geçenlerde", gun: 5 }, { k: "yakın zamanda", gun: 7 },
+  { k: "geçenlerde", gun: 5 }, { k: "son günlerde", gun: 5 },
 
-  // Hafta / ay / yıl
   { k: "bu hafta", gun: 3 }, { k: "geçen hafta", gun: 7 },
-  { k: "geçtiğimiz hafta", gun: 7 }, { k: "bu ay", gun: 15 },
-  { k: "geçen ay", gun: 30 }, { k: "geçtiğimiz ay", gun: 30 },
-  { k: "son günlerde", gun: 5 }, { k: "son haftalarda", gun: 14 },
+  { k: "geçtiğimiz hafta", gun: 7 }, { k: "son haftalarda", gun: 14 },
+  { k: "bu ay", gun: 15 }, { k: "geçen ay", gun: 30 }, { k: "geçtiğimiz ay", gun: 30 },
 ];
 
-/**
- * GELECEK zaman -> henüz OLMAMIŞ. İki alt durum var:
- *   - Program/takvim sorusu ("yarın maç saat kaçta") -> doğrulanabilir, web
- *   - Tahmin sorusu ("yarın ne olacak", "kazanır mı") -> doğrulanamaz, SUS
- */
+/** Gelecek zaman ifadeleri — nesnel. */
 export const TIME_FUTURE = [
   "yarın", "yarınki", "öbür gün", "haftaya", "gelecek hafta",
   "önümüzdeki hafta", "gelecek ay", "önümüzdeki ay", "seneye",
-  "gelecek sene", "az sonra", "birazdan", "akşama",
+  "gelecek sene", "az sonra", "birazdan",
 ];
 
-/** Gelecek + bu kalıplar = TAHMİN -> doğrulanamaz, susulmalı. */
-export const PREDICTION = [
-  "ne olacak", "ne olur", "kazanır mı", "kaybeder mi", "çıkar mı",
-  "olur mu acaba", "yapar mı", "gelir mi", "düşer mi", "artar mı",
-  "beklentiniz", "tahmininiz", "sizce ne olur", "nasıl biter",
-  // "kim kazanır" gibi sonuç tahmini kalıpları
-  "kim kazanır", "kim kaybeder", "kim çıkar", "kim olur",
-  "ne çıkar", "kaç olur", "ne kadar olur", "kaça çıkar",
-  "kaç yapar", "nasıl sonuçlanır", "kim şampiyon olur",
+/**
+ * GELECEK ZAMAN FİİL EKİ — henüz olmamış bir şey doğrulanamaz.
+ *
+ *   "grev ne zaman bitECEK"  -> tahmin, cevaplanamaz
+ *   "grev bitTİ mi"          -> gerçek soru, cevaplanabilir
+ *
+ * ÖNEMLİ İSTİSNA — bu ek TEK BAŞINA "kesin ele" demek DEĞİL.
+ * Gelecek zamanlı bir cümle TAKVİM/TARİH sorusu olabilir:
+ *
+ *   "seçim ne zaman yapılacak"      -> tarih sorusu, CEVAPLANABİLİR
+ *   "maç saat kaçta başlayacak"     -> program, CEVAPLANABİLİR
+ *   "yeni bakan ne zaman açıklanacak" -> tarih, CEVAPLANABİLİR
+ *   "zam ne kadar olacak"           -> tahmin, cevaplanamaz
+ *
+ * İlk üçü bilgi isteği; regex bunları eleyip susarsa gerçek soruyu
+ * kaçırırız. Kural: -acak eki VAR ama tarih/program işareti de VARSA
+ * (ne zaman, saat kaç, kaçta, hangi gün...) regex KESİN kabul etmez,
+ * Llama'ya bırakır. Şüphe varsa modele — bizim temel ilkemiz.
+ */
+export const FUTURE_TENSE = /\b\p{L}+(acak|ecek|acağ|eceğ)\b/u;
+
+/**
+ * TARİH/PROGRAM İŞARETİ — "ne zaman", "saat kaç" gibi.
+ * Gelecek zamanlı cümlede bu varsa, cümle tahmin değil takvim sorusudur;
+ * regex kesin eleme yapmaz, model karar verir.
+ */
+export const SCHEDULE_MARKER = [
+  "ne zaman", "saat kaç", "kaçta", "hangi gün", "hangi tarih",
+  "hangi saat", "kaç günde", "ne vakit", "günü belli", "tarihi belli",
+  "açıklanacak mı", "belli oldu mu", "kesinleşti mi",
 ];
 
-/** Dönem ifadeleri — taze DEĞİL, tarihsel bağlam. */
+/** Dönem ifadeleri — tarihsel bağlam, taze değil. */
 export const ERA = [
-  "pandemi döneminde", "pandemide", "kovid döneminde", "darbe döneminde",
-  "seçim öncesinde", "o dönemde", "o yıllarda", "eskiden", "geçmişte",
-  "90'larda", "80'lerde", "2000'lerde", "çocukluğumda", "eski zamanlarda",
+  "pandemi döneminde", "pandemide", "kovid döneminde", "o dönemde",
+  "o yıllarda", "eskiden", "geçmişte", "90'larda", "80'lerde", "2000'lerde",
+  "çocukluğumda", "eski zamanlarda",
 ];
 
 /* ================================================================== */
-/* 3. OLAY TÜRLERİ — tazelik sinyali                                   */
+/* 3. KONU — hangi bilgi katmanına gideceğini belirler                 */
 /* ================================================================== */
 
-/** Doğası gereği güncel olan olaylar -> doğrudan web. */
-export const FRESH_EVENT = [
-  // Spor
-  "maç", "skor", "kaç kaç", "gol", "derbi", "kazandı", "kaybetti",
-  "berabere", "puan durumu", "şampiyon oldu", "kupa", "transfer",
-  "sakatlandı", "kırmızı kart", "penaltı",
-
-  // Siyaset / kamu
-  "miting", "açıklama yaptı", "istifa", "atandı", "görevden alındı",
-  "kabine", "zirve", "ateşkes", "operasyon", "seçim sonuc", "sandık",
-  "oy oranı", "koalisyon", "güvenoyu",
-
-  // Ekonomi olayı (gösterge değil, OLAY)
-  "zam geldi", "indirim geldi", "faiz kararı", "borsa çakıldı",
-  "borsa yükseldi", "iflas etti", "halka arz",
-
-  // Afet / adli
-  "deprem", "sel", "yangın", "kaza", "patlama", "çöktü",
-  "gözaltına alındı", "tutuklandı", "serbest bırakıldı", "dava açıldı",
-
-  // Kültür / medya
-  "konser", "festival", "vizyona girdi", "ödül aldı", "vefat etti",
-  "hayatını kaybetti", "açıldı", "kapandı",
-
-  // Genel
-  "karar aldı", "toplantı", "duruşma", "yeni açıklandı", "duyuruldu",
-];
-
-/* ================================================================== */
-/* 4. YARI-GÜNCEL GÖSTERGELER — Vectorize'da tutulabilir               */
-/* ================================================================== */
-
+/**
+ * Yarı-güncel göstergeler.
+ *
+ * BU LİSTE SADECE BİR HIZLANDIRMA, GÜVENLİK AĞI DEĞİL.
+ *
+ * Rolü: bu kelimelerden biri geçen soruyu doğrudan SEMI'ye atıp web'i de
+ * seçenek yapmak (bayat yerel veri durumunda web'e düşebilsin diye).
+ *
+ * Ama bir kelimeyi KAÇIRSA da sorun olmaz: o soru STATIC sayılır, STATIC de
+ * Vectorize'a bakar (route'da local:true). Yani "enflasyon" listede olmasa
+ * bile, Vectorize'da enflasyon kaydı varsa soru yine oradan cevaplanır.
+ *
+ * Bu yüzden liste kısa tutulabilir — eksiksiz olması GEREKMEZ. Vectorize
+ * anlam eşleştirmesi asıl işi yapıyor. Liste sadece "web'e düşme iznini"
+ * önden veriyor.
+ */
 export const SEMI_INDICATOR = [
-  // Enflasyon / fiyat
-  "enflasyon", "tüfe", "üfe", "yıllık enflasyon", "aylık enflasyon",
-  "sepet", "açlık sınırı", "yoksulluk sınırı",
+  "enflasyon", "tüfe", "üfe", "asgari ücret", "emekli maaşı", "memur zammı",
+  "nüfus", "işsizlik", "istihdam", "büyüme oranı", "bütçe açığı", "cari açık",
+  "politika faizi", "faiz oranı", "merkez bankası",
+  "dolar kuru", "euro kuru", "altın fiyat", "gram altın",
+  "kdv oranı", "vergi dilimi", "açlık sınırı", "yoksulluk sınırı",
+];
 
-  // Ücret / gelir
-  "asgari ücret", "emekli maaşı", "memur zammı", "memur maaşı",
-  "kıdem tazminatı", "işsizlik maaşı", "kira artış",
-
-  // Makro
-  "nüfus", "işsizlik", "istihdam", "büyüme oranı", "gsyh",
-  "bütçe açığı", "cari açık", "dış ticaret", "ihracat rakam",
-  "rezerv", "borç stoku",
-
-  // Para / faiz
-  "politika faizi", "faiz oranı", "merkez bankası", "mevduat faizi",
-  "kredi faizi",
-
-  // Kur / emtia
-  "dolar kuru", "euro kuru", "sterlin kuru", "altın fiyat", "gram altın",
-  "çeyrek altın", "petrol fiyat", "brent", "doğalgaz fiyat",
-
-  // Vergi / harç
-  "kdv oranı", "ötv", "vergi dilimi", "harç", "mtv",
+/**
+ * Doğası gereği güncel olan olay türleri.
+ *
+ * BU LİSTE KONU BELİRLER, NİYET BELİRLEMEZ.
+ * "dünkü maç" ifadesi bize sadece şunu söyler: konuşulan bilgi günceldir,
+ * yani cevap web'den gelmelidir. Konuşmacının bilgi isteyip istemediğini
+ * SÖYLEMEZ:
+ *
+ *   "dünkü maç ne olmuş acaba"        -> istek
+ *   "dünkü maçı sonra konuşuruz"      -> istek değil
+ *
+ * İkisinde de "dün" ve "maç" var. Niyet kararı intent.js'te.
+ * Liste bilerek kısa; kaçanları model yakalar.
+ */
+export const FRESH_EVENT = [
+  "maç", "skor", "kaç kaç", "gol", "derbi", "şampiyon",
+  "seçim sonuç", "oy oranı", "sandık",
+  "deprem", "sel", "yangın", "kaza", "patlama",
+  "istifa", "gözaltı", "tutuklandı", "vefat", "hayatını kaybetti",
+  "konser", "vizyona girdi", "son dakika",
 ];
 
 /* ================================================================== */
-/* 5. ÖZNEL — doğrulanamaz                                             */
+/* 4. KESİN ELEME — niyet açısından tartışmasız olanlar                */
 /* ================================================================== */
 
-export const SUBJECTIVE = [
+/**
+ * NİYET sinyalleri. Buradaki her madde şu testi geçmeli:
+ *
+ *   "Bu kalıp geçen bir cümle, HİÇBİR bağlamda bilgi isteği olabilir mi?"
+ *   Cevap kesin HAYIR ise buraya girer. En ufak şüphe varsa GİRMEZ,
+ *   model karar verir.
+ *
+ * Bu yüzden liste kısa ve kısa kalacak. Uzatma isteği geldiğinde şunu
+ * hatırla: yanlış eleme, gereksiz tetiklemeden daha kötüdür — sunucu
+ * gerçekten yardım isterken sessiz kalırsın.
+ */
+
+/**
+ * Sadece HİÇ tartışmaya açık olmayanlar. "bence" diyen biri görüş
+ * belirtiyordur, nokta.
+ *
+ * Belirsiz durumlar (retorik ifadeler, dolaylı sorular) BURAYA EKLENMEZ —
+ * onlar intent.js'in işi.
+ */
+export const HARD_SKIP = [
+  // Görüş bildirimi — hiçbir bağlamda bilgi isteği değil
   "bence", "sence", "bana kalırsa", "bana göre", "kanaatimce",
-  "daha iyi", "daha güzel", "daha kötü", "en iyisi", "en güzeli",
-  "sevdim", "beğendim", "hoşuma", "bayıldım", "nefret",
-  "kötü müydü", "iyi miydi", "güzel değil miydi", "sıkıcı",
-  "haklı mıyım", "katılıyor musunuz",
+  // Doğrudan görüş isteme — bizden değil, muhataptan isteniyor
+  "sizce ne olur", "sizce ne olacak", "beklentiniz", "tahmininiz",
+  "ne dersiniz", "katılıyor musunuz",
+  // Tahmin — henüz olmamış, kaynak yok
+  "kim kazanır", "kim kaybeder", "kim şampiyon olur",
 ];
 
-/* ================================================================== */
-/* 6. DURUM DEĞİŞİKLİĞİ — regex kararsız, triyaja gider                */
-/* ================================================================== */
-
-/** Bir şeyin durumunun değişip değişmediği soruluyor. */
-export const EVENT_VERB = [
-  "bitti", "bitmiş", "bitecek", "bitmedi",
-  "başladı", "başlamış", "başlayacak", "başlamadı",
-  "açıldı", "kapandı", "kapatıldı", "iptal", "ertelendi",
-  "onaylandı", "reddedildi", "imzalandı", "yürürlüğe",
-  "kaldırıldı", "getirildi", "durduruldu", "çıktı mı", "çıkmış",
-  "geçti mi", "kabul edildi", "yasaklandı", "serbest bırakıldı",
-  "sürüyor", "devam ediyor", "sonuçlandı", "karara bağlandı",
-  "tamamlandı", "yayınlandı", "uygulanıyor",
-  "anlaştı", "uzlaştı", "asıldı", "asılmış", "toplandı", "dağıldı",
-  // kurum/kişi bildirimi — genelde güncel, ama tarihsel de olabilir
-  "açıkladı", "duyurdu", "paylaştı", "bildirdi", "ilan etti", "sundu",
-];
-
-/** Olay bildiren isimler. */
-export const EVENT_NOUN = [
-  "grev", "zam", "indirim", "kanun", "yasa", "tasarı", "yönetmelik",
-  "seçim", "referandum", "dava", "duruşma", "karar", "hüküm",
-  "anlaşma", "protokol", "sözleşme", "protesto", "boykot", "eylem",
-  "ihale", "atama", "istifa", "kabine", "zirve", "müzakere",
-  "soruşturma", "ceza", "af", "imar", "proje", "inşaat", "ruhsat",
-  "kampanya", "başvuru", "sınav", "kura", "denetim",
-];
+/**
+ * Geriye kalan HER ŞEY modele gider. Buna dahil olanlar:
+ *
+ *   "göreceğiz"          -> genelde retorik AMA "ne oldu göreceğiz bakalım,
+ *                           Veysel bir bakar mısın" gibi kullanımlar var
+ *   "bilmiyorum"         -> "asgari ücret ne oldu bilmiyorum" istek olabilir
+ *   "ne oldu"            -> hitap varsa istek, yoksa değil
+ *   "bunun / o işin"     -> bağlam olmadan anlaşılmaz
+ *
+ * Bunları listeye eklemek denendi; liste 40 maddeye çıktı ve hâlâ
+ * yanlış sonuç veriyordu. Model bağlamla birlikte daha isabetli.
+ */
 
 /* ================================================================== */
-
-/* ================================================================== */
-/* EŞLEŞTİRME YARDIMCILARI                                             */
+/* EŞLEŞTİRME                                                          */
 /* ================================================================== */
 
 /**
  * Türkçe eklemeli bir dil olduğu için düz substring araması hatalı sonuç verir:
  *
- *     "ne ZAMan ilan edildi"  içinde "zam"   var  -> yanlış eşleşme ❌
- *     "AFiş asıldı"           içinde "af"    var  -> yanlış eşleşme ❌
- *     "zamLAR geldi"                          -> doğru eşleşme olmalı ✓
+ *     "ne ZAMan"  içinde "zam"  var  -> yanlış eşleşme ❌
+ *     "AFiş"      içinde "af"   var  -> yanlış eşleşme ❌
+ *     "zamLAR"                        -> doğru eşleşme ✓
  *
- * Çözüm: kelimeyi token'lara böl, token kelimeyle BAŞLIYORSA kalan kısmın
- * geçerli bir Türkçe ek olup olmadığına bak.
- *
- *     "zaman" -> "zam" + "an"   -> "an" ek değil  -> eşleşme YOK  ✓
- *     "zamlar"-> "zam" + "lar"  -> "lar" ek       -> eşleşme VAR  ✓
+ * Çözüm: token'lara böl, token kelimeyle başlıyorsa kalanın geçerli bir
+ * Türkçe ek olup olmadığına bak.
  */
 const SUFFIX = new Set([
   "",
-  // çoğul
   "lar", "ler", "ları", "leri", "larda", "lerde", "lardan", "lerden",
-  // hal ekleri
   "ı", "i", "u", "ü", "yı", "yi", "yu", "yü",
   "a", "e", "ya", "ye", "na", "ne",
   "da", "de", "ta", "te", "nda", "nde",
   "dan", "den", "tan", "ten", "ndan", "nden",
   "ın", "in", "un", "ün", "nın", "nin", "nun", "nün",
   "la", "le", "yla", "yle",
-  // iyelik
   "sı", "si", "su", "sü", "m", "n", "mız", "miz", "nız", "niz",
-  // soru
   "mı", "mi", "mu", "mü",
-  // sık birleşimler
-  "ları", "leri", "larını", "lerini", "ması", "mesi",
+  "larını", "lerini", "ması", "mesi",
 ]);
 
-/** Tek kelimelik terim için ek-duyarlı eşleşme. */
 function matchWord(tokens, word) {
   for (const tok of tokens) {
     if (!tok.startsWith(word)) continue;
@@ -284,16 +275,14 @@ function matchWord(tokens, word) {
 
 /**
  * Bir metinde liste elemanlarından biri geçiyor mu?
- *  - Çok kelimeli ifadeler ("emin değilim") -> düz substring
- *  - Tek kelimeler ("zam")                  -> ek-duyarlı eşleşme
+ *  - Boşluk/kesme/rakam içeren ifadeler -> düz substring
+ *  - Tek kelimeler                      -> ek-duyarlı eşleşme
  */
 export function matchAny(text, list) {
   const t = (text || "").toLowerCase();
   const tokens = t.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
   for (const w of list) {
-    // Boşluk, kesme işareti veya rakam içeren terimler ("90'larda",
-    // "emin değilim") token'a bölünemez -> düz substring.
     if (/[^\p{L}]/u.test(w)) {
       if (t.includes(w)) return true;
     } else if (matchWord(tokens, w)) {
@@ -303,18 +292,18 @@ export function matchAny(text, list) {
   return false;
 }
 
-/** Android uygulamasına gönderilecek paket. */
+/* ================================================================== */
+
+/** Android uygulamasına gönderilen paket. */
 export function lexiconPayload() {
   return {
     version: VERSION,
-    hedge: HEDGE_ALL,
-    hedge_ignore: HEDGE_IGNORE,
-    subjective: SUBJECTIVE,
-    // Cihazda "doğrulanabilir bir şey var mı" kontrolü için ipuçları
-    checkable_hint: [
-      ...SEMI_INDICATOR.slice(0, 40),
-      ...FRESH_EVENT.slice(0, 40),
-      ...EVENT_NOUN.slice(0, 30),
-    ],
+    hedge: HEDGE,
+    hedgeIgnore: HEDGE_IGNORE,
+    // Cihazda kesin elenecekler. Kısa tutuldu; asıl eleme sunucuda,
+    // niyet kontrolüyle yapılıyor.
+    noTrigger: HARD_SKIP,
+    // Cümlede doğrulanabilir bir konu var mı kontrolü için
+    checkableHints: [...SEMI_INDICATOR, ...FRESH_EVENT],
   };
 }

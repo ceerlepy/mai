@@ -1,4 +1,4 @@
-name = "teyit-asistani"
+name = "mai"
 main = "src/index.js"
 compatibility_date = "2026-07-01"
 workers_dev = true
@@ -13,21 +13,34 @@ binding = "AI"
 # exa / tavily / none
 SEARCH_PROVIDER = "brave"
 
+# Niyet kontrolü ile arama paralel mi koşsun, seri mi?
+#   "false" (varsayılan) -> paralel. Gecikme değişmez, ama niyet "hayır"
+#                           derse yapılmış arama çöpe gider (para kaybı).
+#   "true"               -> seri. Boşa arama yok, +200 ms gecikme.
+# Arama kotan sıkışırsa "true" yap.
+INTENT_BEFORE_SEARCH = "false"
+
 # ---- KV cache (tavsiye edilir) --------------------------------------
 # Aynı soru tekrar gelirse ~20ms, arama ücreti de ödenmez.
 #   npx wrangler kv namespace create CACHE
 # [[kv_namespaces]]
 # binding = "CACHE"
 # id = "BURAYA_KV_ID"
+[[kv_namespaces]]
+binding = "CACHE"
+id = "5b93bf73843345febd465f4ed008f394"
 
 # ---- Vectorize: yerel bilgi tabanı (ASIL KAZANÇ) --------------------
 # Enflasyon, asgari ücret, nüfus gibi yarı-güncel sayısalları önceden
 # yükle -> ~80ms'de cevaplanır, web aramasına HİÇ gidilmez.
 # Arama hacmini ~10 kat düşürür, ücretsiz kredi rahat yeter.
-#   npx wrangler vectorize create teyit-bilgi --dimensions=1024 --metric=cosine
+#   npx wrangler vectorize create mai --dimensions=1024 --metric=cosine
 # [[vectorize]]
 # binding = "VEC"
-# index_name = "teyit-bilgi"
+# index_name = "mai"
+[[vectorize]]
+binding = "VEC"
+index_name = "mai"
 
 [observability]
 enabled = true

@@ -218,20 +218,5 @@ function strip(s) {
   return String(s || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").slice(0, 220);
 }
 
-/**
- * Sorgu üretimi — LLM'siz, regex, ~0ms.
- * Tereddüt kalıpları ve dolgu kelimeleri atılır, çekirdek terimler kalır.
- */
-export function buildQuery(q, context = "") {
-  const HEDGE = /\b(sanırım|sanıyorum|galiba|zannedersem|zannediyorum|herhalde|yanılmıyorsam|yanlış hatırlamıyorsam|yanlış bilmiyorsam|emin değilim|emin olamadım|hatırladığım kadarıyla|tam hatırlamıyorum|neydi|değil miydi|öyle miydi|doğru mu|diye biliyorum)\b/gi;
-  const FILLER = /\b(şey|yani|işte|hani|falan|filan|bir|bu|şu|çok|daha|ama|için|ile|olarak|gibi|kadar|sonra|önce|tabii|aslında)\b/gi;
-
-  let s = ((context ? context + " " : "") + q)
-    .replace(HEDGE, " ")
-    .replace(FILLER, " ")
-    .replace(/[^\p{L}\p{N}\s%.,]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return s.split(" ").filter((x) => x.length > 2).slice(0, 8).join(" ");
-}
+// buildQuery topic.js'e taşındı — HEDGE listesiyle senkron kalması için
+// sözlükle aynı modülde durması gerekiyordu.

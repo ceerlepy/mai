@@ -7,3 +7,4 @@ local.properties
 .idea/
 *.apk
 .DS_Store
+.history

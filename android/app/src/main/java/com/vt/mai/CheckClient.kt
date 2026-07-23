@@ -1,4 +1,4 @@
-package com.vt.teyit
+package com.vt.mai
 
 import kotlinx.coroutines.*
 import okhttp3.*
@@ -7,13 +7,26 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
+/**
+ * Worker'ın /check ucundan dönen cevap.
+ * Alan adları API sözleşmesiyle birebir aynı (bkz. API.md).
+ */
 data class Answer(
     val text: String,
-    val src: String,          // model | web | yerel | cache | öznel | yok
-    val cls: String = "",     // fresh | semi | static | subj
-    val ms: Long,
-    val final: Boolean,
-    val refs: List<String> = emptyList()
+    /** cache | local | web | model | none | no-request */
+    val source: String,
+    /** fresh | semi | static — bilginin türü (nesnel) */
+    val topicClass: String = "",
+    /** Konuşmacı bilgi istiyor muymuş — false ise ekrana hiçbir şey basılmaz */
+    val speakerWantsInfo: Boolean = true,
+    /** regex | model | cache — niyet kararını kim verdi */
+    val intentCheckedBy: String = "",
+    /** İstek başlangıcından bu cevaba kadar geçen süre */
+    val latencyMs: Long,
+    /** false ise bu bir ara sonuç, kesin cevap değil */
+    val isFinal: Boolean,
+    /** Cevabın dayandığı kaynak URL'leri */
+    val sources: List<String> = emptyList()
 )
 
 /**
@@ -118,22 +131,24 @@ class CheckClient(private val base: String) {
             "draft" -> onDraft(j.optString("text"))
             "answer" -> {
                 val refs = mutableListOf<String>()
-                j.optJSONArray("refs")?.let { a ->
+                j.optJSONArray("sources")?.let { a ->
                     for (i in 0 until a.length())
                         a.optJSONObject(i)?.optString("url")?.let(refs::add)
                 }
                 onAnswer(
                     Answer(
                         text = j.optString("text"),
-                        src = j.optString("src"),
-                        cls = j.optString("cls"),
-                        ms = j.optLong("ms"),
-                        final = j.optBoolean("final", true),
-                        refs = refs
+                        source = j.optString("source"),
+                        topicClass = j.optString("topicClass"),
+                        speakerWantsInfo = j.optBoolean("speakerWantsInfo", true),
+                        intentCheckedBy = j.optString("intentCheckedBy"),
+                        latencyMs = j.optLong("latencyMs"),
+                        isFinal = j.optBoolean("isFinal", true),
+                        sources = refs
                     )
                 )
             }
-            "done" -> onDone(j.optLong("ms"))
+            "done" -> onDone(j.optLong("latencyMs"))
         }
     }
 }

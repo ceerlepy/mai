@@ -1,4 +1,4 @@
-package com.vt.teyit
+package com.vt.mai
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -34,7 +34,7 @@ object T {
     val Web       = Color(0xFF60A5FA)   // web kaynaklı
 }
 
-private val TeyitType = Typography(
+private val MaiType = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
@@ -62,7 +62,7 @@ private val TeyitType = Typography(
 )
 
 @Composable
-fun TeyitTheme(content: @Composable () -> Unit) {
+fun MaiTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
             background = T.Bg,
@@ -73,7 +73,7 @@ fun TeyitTheme(content: @Composable () -> Unit) {
             onSurface = T.Text,
             error = T.Live
         ),
-        typography = TeyitType,
+        typography = MaiType,
         content = content
     )
 }

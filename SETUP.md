@@ -1,4 +1,4 @@
-# KURULUM
+# Kurulum
 
 Her adımda **komut**, **ne yaptığı**, **neden gerekli** ve **doğrulama** var.
 Doğrulama geçmeden sonraki adıma geçme.
@@ -91,10 +91,35 @@ yanlış cevap vermez, sadece yavaşlar.
 # 0. Ön koşullar
 
 ```bash
-node --version    # v18 veya üstü
+node --version    # v22 veya üstü ZORUNLU
 ```
 
-Node yoksa: nodejs.org → LTS
+**Wrangler v4+ Node 22 istiyor.** Node 18 ile şu hatayı alırsın:
+`Wrangler requires at least Node.js v22.0.0`
+
+Node 22 kurulumu (macOS/Linux):
+
+```bash
+# nvm yoksa kur
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.zshrc          # bash kullanıyorsan ~/.bashrc
+
+nvm install 22
+nvm use 22
+nvm alias default 22     # yeni terminallerde de 22 açılsın
+node --version           # v22.x.x
+```
+
+Homebrew ile:
+```bash
+brew install node@22
+brew link --overwrite --force node@22
+```
+
+> Daha önce eski Node ile `npm install` yaptıysan, geçiş sonrası temizle:
+> ```bash
+> rm -rf node_modules package-lock.json && npm install
+> ```
 
 **Hesaplar:**
 
@@ -132,14 +157,16 @@ npm install
 npm test
 ```
 
-**Ne yapıyor:** 88 test çalıştırıyor — soru sınıflandırma mantığı, Türkçe ek
+**Ne yapıyor:** 72 test çalıştırıyor — soru sınıflandırma mantığı, Türkçe ek
 tuzakları (`"ne **zam**an"` içindeki `zam` yanlış eşleşmemeli), yönlendirme
-planları ve kritik güvenlik kuralları.
+planları, konu/niyet ayrımı ve kritik güvenlik kuralları.
+Niyet kontrolü model çağrısı yaptığı için burada değil — onun testi
+deploy sonrası `npm run test:intent`.
 
 **Neden deploy'dan önce:** Bunlar ağ gerektirmiyor, saniyeler sürüyor. Bozuksa
 deploy etmenin anlamı yok.
 
-**Doğrulama:** `TÜM TESTLER GEÇTİ (88/88)`
+**Doğrulama:** `TÜM TESTLER GEÇTİ (72/72)`
 
 ---
 
@@ -277,10 +304,20 @@ karşılaştır.
 asgari ücret, nüfus, politika faizi, işsizlik, istihdam, memur zammı.
 
 ```bash
-chmod +x scripts/ingest.sh test/triage.test.sh
+chmod +x scripts/ingest.sh test/intent.test.sh
+
+# Bu iki değişken HER YENİ TERMİNALDE tanımlı olmalı.
+# Tanımsızsa script "WORKER: unbound variable" hatası verir.
+export WORKER=https://mai.XXXX.workers.dev
 export TOKEN=<4. adımdaki INGEST_TOKEN>
+
+echo $WORKER && curl $WORKER/health     # önce bağlantıyı doğrula
+
 ./scripts/ingest.sh scripts/seed.json
 ```
+
+> `WORKER`'ı kalıcı yapabilirsin: `echo "export WORKER=$WORKER" >> ~/.zshrc`
+> `TOKEN`'ı **yazma** — o bir parola, dosyada açık durmasın.
 
 **Ne yapıyor:** Her kaydın metnini embedding modeline gönderip 1024 boyutlu
 vektöre çeviriyor, Vectorize'a yazıyor.
@@ -333,22 +370,27 @@ bir araç canlı yayında işe yaramaz — sunucu çoktan konuyu geçmiştir.
 
 ---
 
-# 9. Triyaj testi
+# 9. Niyet testi
 
 ```bash
-npm run test:triage
+npm run test:intent
 ```
 
-**Ne yapıyor:** Regex'in karar veremediği cümleleri (`"grev bitmiş miydi"`)
-gerçek modele gönderip doğru karar verip vermediğini ve kaç ms sürdüğünü
-ölçüyor.
+**Ne yapıyor:** 13 örnek cümleyi gerçek modele gönderip niyet kararını ve
+süresini ölçüyor.
 
 **Beklenen:**
-- Tarihsel olanlar (Osmanlı, Lozan, Fransız İhtilali) → `static`
-- Güncel olanlar (grev, kanun, dava, zam) → `fresh`
-- Süre **150–250 ms**
 
-400 ms üstündeyse `triage.js` içindeki tavan devreye giriyor demektir.
+| Cevap | Cümleler |
+|---|---|
+| EVET | "Veysel asgari ücret ne oldu", "arkadaşlar...", "grev bitmiş miydi", "enflasyon sanırım %35ti", "Lozan hangi yıl", "dünkü maç ne olmuş" |
+| hayır | "asgari ücret ne oldu bilmiyorum", "sonucu ne oldu göreceğiz", "dünkü maçı sonra konuşuruz", "neyse konumuza dönelim", "bence enflasyon yüksek" |
+
+Süre **150–250 ms** bandında olmalı. 400 ms üstündeyse `intent.js` tavanı
+devreye giriyor demektir.
+
+`KARAR` sütunu `regex` ise model hiç çağrılmamış (0 ms) — o cümle
+`precheckIntent()` tarafından kesin elenmiş.
 
 ---
 
@@ -448,6 +490,7 @@ Artık `worker/` altında her push'ta otomatik deploy olur.
 | `BRAVE_KEY` | wrangler secret | ✓ | web araması |
 | `INGEST_TOKEN` | wrangler secret | ✓ | `/ingest` ucunu korur |
 | `SEARCH_PROVIDER` | `wrangler.toml` `[vars]` | ✗ | brave / serper / exa / tavily / none |
+| `INTENT_BEFORE_SEARCH` | `wrangler.toml` `[vars]` | ✗ | `false` (varsayılan) = niyet ve arama paralel, hızlı. `true` = seri, +200 ms ama boşa arama yok |
 | `CACHE` | `wrangler.toml` binding | ✗ | KV — **isim sabit** |
 | `VEC` | `wrangler.toml` binding | ✗ | Vectorize — **isim sabit** |
 | `AI` | `wrangler.toml` binding | ✗ | Workers AI — **isim sabit** |
@@ -489,4 +532,26 @@ curl $WORKER/bench | python3 -m json.tool  # gecikme
 | Çok sık tetikleniyor | Hedge listesi gevşek | `src/lexicon.js` → `HEDGE`'ten kalıp çıkar, `VERSION` artır, deploy |
 | APK derlenmiyor | `WORKER_URL` yok | GitHub → **Variables** sekmesi (Secrets değil) |
 | STT Türkçe anlamıyor | Dil paketi | Telefon → Ayarlar → Google → Ses → Türkçe indir |
+| `Wrangler requires at least Node.js v22` | Node eski | `nvm install 22 && nvm use 22`, sonra `rm -rf node_modules && npm install` |
+| `WORKER: unbound variable` | Değişken tanımsız | `export WORKER=https://...workers.dev` |
+| `Expecting value: line 1 column 1` | curl boş döndü | Üsttekinin sonucu; `WORKER` düzelince gider |
 | Cevaplar yavaş | Arama yavaş | `bench` çalıştır, gerekirse `SEARCH_PROVIDER = "none"` |
+
+
+---
+
+# Bakım notu
+
+İki düzenli iş var (ikisi de kod değil, veri):
+
+1. **`scripts/seed.json` — ayda bir.** TÜİK/TCMB yeni rakam açıklayınca güncelle
+   ve `./scripts/ingest.sh` çalıştır. Unutursan `maxDays` bayat kaydı otomatik
+   web'e düşürür; yanlış cevap gitmez ama o soru yavaşlar.
+
+2. **`SEMI_INDICATOR` listesi (lexicon.js) — çok seyrek.** Yeni bir ekonomik
+   gösterge sorulmaya başlarsa listeye ekle. Bu liste bir konunun `semi`
+   sayılıp web'e gidebilmesini sağlıyor; olmadan `static` olur ve web'e hiç
+   gitmez, yani bayat veri güncellenemez.
+
+Otomatikleştirme (cron worker ile seed'i kendiliğinden güncelleme) README
+"Gelecek işler" bölümünde TODO olarak duruyor.

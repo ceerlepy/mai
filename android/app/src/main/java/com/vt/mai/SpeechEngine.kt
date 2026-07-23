@@ -1,4 +1,4 @@
-package com.vt.teyit
+package com.vt.mai
 
 import android.content.Context
 import android.content.Intent

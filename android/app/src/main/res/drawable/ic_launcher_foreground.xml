@@ -1,10 +1,27 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- mikrofon gövdesi -->
-    <path android:fillColor="#4ADE80"
-        android:pathData="M54,30c-4.4,0 -8,3.6 -8,8v16c0,4.4 3.6,8 8,8s8,-3.6 8,-8V38C62,33.6 58.4,30 54,30z"/>
-    <!-- kavis -->
-    <path android:fillColor="#4ADE80"
-        android:pathData="M68,52c0,7.7 -6.3,14 -14,14s-14,-6.3 -14,-14h-5c0,9.6 7.2,17.5 16.5,18.8V78h5v-7.2C66.8,69.5 74,61.6 74,52H68z"/>
+
+    <!-- Adaptive icon güvenli alanı: merkez 66x66 (x,y 21..87).
+         Amblem bu alanın içinde kalıyor ki launcher kırpmasın. -->
+
+    <!-- "M" harfi — açık mavi, kalın -->
+    <path android:fillColor="#7DD3FC"
+        android:pathData="M33,42 L33,66 L38,66 L38,52 L44,63 L50,52 L50,66 L55,66 L55,42 L49,42 L44,52 L39,42 Z"/>
+
+    <!-- ayırıcı nokta · -->
+    <path android:fillColor="#38BDF8"
+        android:pathData="M60,52 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"/>
+
+    <!-- "A" harfi -->
+    <path android:fillColor="#7DD3FC"
+        android:pathData="M66,66 L71,42 L76,42 L81,66 L76,66 L75,60 L72,60 L71,66 Z M72.6,55.5 L74.4,55.5 L73.5,49 Z"/>
+
+    <!-- "I" harfi -->
+    <path android:fillColor="#7DD3FC"
+        android:pathData="M84,42 L89,42 L89,66 L84,66 Z"/>
+
+    <!-- alt vurgu çizgisi — sinyal/dalga hissi, daha koyu mavi -->
+    <path android:fillColor="#38BDF8"
+        android:pathData="M33,72 L89,72 L89,75 L33,75 Z"/>
 </vector>

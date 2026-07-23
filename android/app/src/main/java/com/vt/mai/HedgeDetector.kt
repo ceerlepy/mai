@@ -1,4 +1,4 @@
-package com.vt.teyit
+package com.vt.mai
 
 import android.content.Context
 import okhttp3.OkHttpClient
@@ -48,6 +48,23 @@ object HedgeDetector {
         "boş ver", "hadi canım",
     )
 
+    /**
+     * HİÇ TETİKLEMEMESİ gerekenler — tahmin ve retorik ifadeler.
+     * Konuşmacı bilgi istemiyor, sadece konuşuyor:
+     *   "bu davanın sonucu ne olacak bilmiyorum"
+     *   "yarın hep birlikte göreceğiz"
+     * Bunlar için ağ turu atmak boşuna maliyet ve ekran gürültüsü.
+     * Tam liste Worker'dan gelir (lexicon.js -> noTrigger).
+     */
+    private val FALLBACK_NO_TRIGGER = listOf(
+        "ne olacak", "ne olur", "nasıl biter", "nasıl sonuçlanır",
+        "sonucu ne", "sonu ne", "kim kazanır", "kim kaybeder",
+        "olur mu acaba", "gelecek mi", "olacak mı", "kaç olur",
+        "sizce ne olur", "beklentiniz", "tahmininiz", "ne dersiniz",
+        "göreceğiz", "zaman gösterecek", "belli olmaz", "kim bilir",
+        "bence", "sence", "bana kalırsa", "bana göre",
+    )
+
     private val FALLBACK_CHECKABLE = listOf(
         "enflasyon", "asgari ücret", "nüfus", "işsizlik", "faiz", "kur",
         "maç", "skor", "gol", "deprem", "konser", "seçim", "zam",
@@ -58,8 +75,17 @@ object HedgeDetector {
 
     @Volatile private var hedge = FALLBACK_HEDGE
     @Volatile private var ignore = FALLBACK_IGNORE
+    @Volatile private var noTrigger = FALLBACK_NO_TRIGGER
     @Volatile private var checkableHints = FALLBACK_CHECKABLE
     @Volatile private var version = 0
+
+    /**
+     * Gelecek zaman fiil eki — henüz olmamış bir şey doğrulanamaz.
+     * Dilbilgisi kuralı, tek desen yüzlerce fiili kapsıyor.
+     *   "bitecek", "gelecek", "açıklanacak" -> tetiklemez
+     *   "bitti", "geldi", "açıklandı"       -> tetikler
+     */
+    private val FUTURE_TENSE = Regex("""\b\p{L}+(acak|ecek|acağ|eceğ)\b""")
 
     /** Rakam / ölçü / özel isim — doğrulanabilir içerik işareti. */
     private val NUMERIC = Regex(
@@ -86,7 +112,7 @@ object HedgeDetector {
                     if (!r.isSuccessful) return@use
                     val body = r.body?.string() ?: return@use
                     apply(JSONObject(body))
-                    ctx.getSharedPreferences("teyit", Context.MODE_PRIVATE)
+                    ctx.getSharedPreferences("mai", Context.MODE_PRIVATE)
                         .edit().putString("lexicon", body).apply()
                 }
             }
@@ -95,7 +121,7 @@ object HedgeDetector {
 
     private fun loadCached(ctx: Context) {
         runCatching {
-            val s = ctx.getSharedPreferences("teyit", Context.MODE_PRIVATE)
+            val s = ctx.getSharedPreferences("mai", Context.MODE_PRIVATE)
                 .getString("lexicon", null) ?: return
             apply(JSONObject(s))
         }
@@ -108,8 +134,9 @@ object HedgeDetector {
             }?.takeIf { it.isNotEmpty() }
 
         arr("hedge")?.let { hedge = it }
-        arr("hedge_ignore")?.let { ignore = it }
-        arr("checkable_hint")?.let { checkableHints = it }
+        arr("hedgeIgnore")?.let { ignore = it }
+        arr("noTrigger")?.let { noTrigger = it }
+        arr("checkableHints")?.let { checkableHints = it }
         version = j.optInt("version", 0)
     }
 
@@ -126,7 +153,15 @@ object HedgeDetector {
     fun detect(text: String, isFinal: Boolean): Hit? {
         val t = text.lowercase().trim()
         if (t.length < 8) return null
+
+        // Yok sayılacak kalıplar ("neyse", "boş ver")
         if (ignore.any { t.contains(it) }) return null
+
+        // Görüş bildirimi -> hiçbir bağlamda bilgi isteği değil
+        if (noTrigger.any { t.contains(it) }) return null
+
+        // Gelecek zaman -> henüz olmamış, doğrulanamaz
+        if (FUTURE_TENSE.containsMatchIn(t)) return null
 
         val hit = hedge.firstOrNull { t.contains(it) } ?: return null
 

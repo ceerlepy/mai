@@ -1,4 +1,4 @@
-package com.vt.teyit
+package com.vt.mai
 
 import android.Manifest
 import android.content.Intent
@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
         client = CheckClient(endpoint)
         // Kelime listesini Worker'dan çek (uzaktan yönetilir, APK derlemeye gerek yok)
         HedgeDetector.init(this, endpoint)
-        setContent { TeyitTheme { Root() } }
+        setContent { MaiTheme { Root() } }
     }
 
     override fun onDestroy() {
@@ -222,7 +222,7 @@ class MainActivity : ComponentActivity() {
                         Text("CANLI", color = T.Live, fontSize = 13.sp,
                             fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
                     } else {
-                        Text("Teyit", color = T.Text, fontSize = 17.sp,
+                        Text("MAI", color = T.Text, fontSize = 17.sp,
                             fontWeight = FontWeight.SemiBold)
                     }
                 }
@@ -239,7 +239,7 @@ class MainActivity : ComponentActivity() {
                 val unsure = answer.text.contains("EMİN DEĞİL", true)
                 val tint = when {
                     unsure -> T.Warn
-                    answer.src == "web" -> T.Text
+                    answer.source == "web" -> T.Text
                     else -> T.Text
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -254,9 +254,9 @@ class MainActivity : ComponentActivity() {
                     )
                     Spacer(Modifier.height(20.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        SourceChip(answer.src)
+                        SourceChip(answer.source)
                         Spacer(Modifier.width(8.dp))
-                        Text("${answer.ms} ms", color = T.TextFaint, fontSize = 11.sp)
+                        Text("${answer.latencyMs} ms", color = T.TextFaint, fontSize = 11.sp)
                     }
                 }
             }
@@ -289,12 +289,12 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun SourceChip(src: String) {
+        // API İngilizce döner, ekranda Türkçe gösterilir
         val (label, c) = when (src) {
             "web" -> "web" to T.Web
-            "yerel" -> "yerel" to T.Accent
+            "local" -> "yerel" to T.Accent
             "cache" -> "önbellek" to T.Accent
-            "öznel" -> "öznel" to T.Warn
-            "yok" -> "kaynak yok" to T.Warn
+            "none" -> "kaynak yok" to T.Warn
             else -> "model" to T.TextDim
         }
         Box(
@@ -352,29 +352,29 @@ class MainActivity : ComponentActivity() {
         )
 
         Box(
-            modifier = Modifier.size(230.dp),
+            modifier = Modifier.size(150.dp),
             contentAlignment = Alignment.Center
         ) {
             // Tereddüt yakalandı -> genişleyen mavi-mor halkalar
             ProcessingRings(
                 active = processing,
-                baseRadiusPx = with(LocalDensity.current) { 79.dp.toPx() }
+                baseRadiusPx = with(LocalDensity.current) { 50.dp.toPx() }
             )
 
             if (live && !processing) {
                 Box(
-                    Modifier.size(210.dp).scale(ring)
+                    Modifier.size(134.dp).scale(ring)
                         .clip(CircleShape).background(T.Live.copy(alpha = 0.07f))
                 )
                 Box(
-                    Modifier.size(184.dp).scale(voice)
+                    Modifier.size(116.dp).scale(voice)
                         .clip(CircleShape).background(T.Live.copy(alpha = 0.14f))
                 )
             }
 
             Box(
                 Modifier
-                    .size(158.dp)
+                    .size(96.dp)
                     .clip(CircleShape)
                     .background(btnColor)
                     .border(
@@ -389,7 +389,7 @@ class MainActivity : ComponentActivity() {
                     if (live) Icons.Rounded.Stop else Icons.Rounded.Mic,
                     if (live) "durdur" else "başlat",
                     tint = Color(0xFF07090B),
-                    modifier = Modifier.size(if (live) 58.dp else 66.dp)
+                    modifier = Modifier.size(if (live) 36.dp else 42.dp)
                 )
             }
         }
@@ -611,11 +611,18 @@ class MainActivity : ComponentActivity() {
                         onDraft = onDraft,
                         onAnswer = { a ->
                             onDraft("")
+                            // Konuşmacı bilgi istemiyormuş -> ekrana hiçbir
+                            // şey basma, sessizce geç. Gereksiz müdahale,
+                            // kaçırılan sorudan daha zararlı.
+                            if (!a.speakerWantsInfo || a.source == "no-request") {
+                                onProcessing(false)
+                                return@fire
+                            }
                             onAnswer(a)
-                            if (a.final) {
+                            if (a.isFinal) {
                                 // Dalga BURADA biter.
                                 onProcessing(false)
-                                store.add(txt, a.text, a.src, a.ms)
+                                store.add(txt, a.text, a.source, a.latencyMs)
                             }
                         },
                         onDone = { onProcessing(false) }   // emniyet: akış kapanırsa da bitir

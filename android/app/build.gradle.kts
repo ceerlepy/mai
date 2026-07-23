@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.vt.teyit"
+    namespace = "com.vt.mai"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.vt.teyit"
+        applicationId = "com.vt.mai"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -20,7 +20,7 @@ android {
         buildConfigField(
             "String",
             "WORKER_URL",
-            "\"${project.findProperty("workerUrl") ?: "https://teyit-asistani.workers.dev"}\""
+            "\"${project.findProperty("workerUrl") ?: "https://mai.workers.dev"}\""
         )
     }
 

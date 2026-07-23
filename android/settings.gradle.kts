@@ -10,5 +10,5 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 
-rootProject.name = "Teyit"
+rootProject.name = "MAI"
 include(":app")

@@ -1,27 +1,77 @@
-TEYİT — paket içeriği
-Oluşturulma: 2026-07-22 21:06 UTC
+MAI — canlı yayın teyit asistanı
+Oluşturulma: 2026-07-22 23:28 UTC
+Dosya sayısı: 42
+Sözlük sürümü: 7 · Test: 72/72
 
-Bu dosya listesindeki her şey pakette olmalı. Açtıktan sonra doğrula:
-    find . -type f | sort
+MİMARİ — İKİ BAĞIMSIZ SORU
+  KONU  (nesnel)  : bilgi hangi türden?   -> topic.js,  regex,  ~0 ms,  0 nöron
+  NİYET (öznel)   : bilgi isteniyor mu?   -> intent.js, llama,  ~200 ms, 1.4 nöron
+
+  Paralel koşarlar. Niyet her zaman kanıt toplamadan kısa olduğu için
+  ek gecikme yaratmaz — aramanın gölgesinde kalır.
+
+KANIT TOPLAMA (kendi içinde SERİ)
+  1. yerel (Vectorize)  80 ms   bedava   -> bulunca web'e HİÇ gitme
+  2. web (Brave)       700 ms   1 sorgu  -> sadece yerel yoksa
+
+KAYNAK YÖNLENDİRME (topic.js, regex belirler)
+  fresh  -> web zorunlu, model tek başına cevaplayamaz
+  semi   -> önce Vectorize, bayatsa web
+  static -> model kendi bilir, web'e gitmez
+
+  seed.json = SEMI'nin veri tarafı. SEMI_INDICATOR listesi "bu konu semi"
+  der (isim), seed.json o konunun gerçek rakamını taşır (veri).
+  Liste olmadan konu static sayılır, static web'e gitmez -> bayat veri
+  güncellenemez. Bu yüzden liste kritik.
+
+MALİYET (gerçek Cloudflare fiyatlarıyla, resmi docs)
+  Ücretsiz kota: 10.000 nöron/gün (00:00 UTC sıfırlanır)
+  Gerçekçi kullanım (90 tetikleme/gün): ~280 nöron = %2.8 -> rahat sığar
+  Tek gerçek sınır: Brave arama kotası (~1000/ay), Vectorize çoğunu önlüyor
+
+DOKÜMANLAR
+  README.md          mimari, karar mantığı, gecikme, ürün kararları, TODO
+  SETUP.md           adım adım kurulum, her komutun gerekçesi, bakım notu
+  TRIGGER-LOGIC.md   neyi değerlendiriyoruz, neyi değerlendirmiyoruz
+  API.md             her uç, her alan, her değerin anlamı
+  DATA-LAYERS.md     KV ve Vectorize'ın kod düzeyinde açıklaması
+
+DOĞRULAMA
+  cd worker && npm install && npm test   -> TÜM TESTLER GEÇTİ (72/72)
+  deploy sonrası: npm run test:intent    -> gerçek llama çağrısı, niyet testi
+  deploy sonrası: curl $WORKER/bench      -> p95 gecikme ölçümü (CRITICAL)
+
+AÇIK İŞLER (README bölüm 7)
+  [ ] /bench ölçümü — gecikme rakamları hâlâ tahmin (en kritik)
+  [ ] cron worker ile otomatik seed güncelleme
+  [ ] test:intent deploy sonrası
+  [ ] Türkçe STT rakam doğruluğu canlıda
+
+SEED VERİLERİ (22 Temmuz 2026, web'den doğrulandı)
+  TÜFE yıllık %32,11 · asgari ücret net 28.075,50 TL · nüfus 86.092.168
+  politika faizi %37 · işsizlik %8,2 · istihdam 32.463.000
 
 DOSYALAR
   .github/workflows/android.yml
   .github/workflows/worker.yml
   .gitignore
-  KURULUM.md
+  API.md
+  DATA-LAYERS.md
   MANIFEST.txt
   README.md
+  SETUP.md
+  TRIGGER-LOGIC.md
   android/.gitignore
   android/app/build.gradle.kts
   android/app/proguard-rules.pro
   android/app/src/main/AndroidManifest.xml
-  android/app/src/main/java/com/vt/teyit/CheckClient.kt
-  android/app/src/main/java/com/vt/teyit/HedgeDetector.kt
-  android/app/src/main/java/com/vt/teyit/MainActivity.kt
-  android/app/src/main/java/com/vt/teyit/SpeechEngine.kt
-  android/app/src/main/java/com/vt/teyit/Store.kt
-  android/app/src/main/java/com/vt/teyit/Theme.kt
-  android/app/src/main/java/com/vt/teyit/WaveEffect.kt
+  android/app/src/main/java/com/vt/mai/CheckClient.kt
+  android/app/src/main/java/com/vt/mai/HedgeDetector.kt
+  android/app/src/main/java/com/vt/mai/MainActivity.kt
+  android/app/src/main/java/com/vt/mai/SpeechEngine.kt
+  android/app/src/main/java/com/vt/mai/Store.kt
+  android/app/src/main/java/com/vt/mai/Theme.kt
+  android/app/src/main/java/com/vt/mai/WaveEffect.kt
   android/app/src/main/res/drawable/ic_launcher_foreground.xml
   android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
   android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
@@ -36,30 +86,11 @@ DOSYALAR
   worker/scripts/ingest.sh
   worker/scripts/seed.json
   worker/src/index.js
+  worker/src/intent.js
   worker/src/knowledge.js
   worker/src/lexicon.js
-  worker/src/router.js
   worker/src/search.js
-  worker/src/triage.js
-  worker/test/router.test.mjs
-  worker/test/triage.test.sh
+  worker/src/topic.js
+  worker/test/intent.test.sh
+  worker/test/topic.test.mjs
   worker/wrangler.toml
-
-HIZLI DOĞRULAMA
-  cd worker && npm install && npm test      -> TÜM TESTLER GEÇTİ (88/88)
-
-BU TURDA EKLENEN / DEĞİŞEN
-  + android/.../WaveEffect.kt      mavi-mor işlem dalgası (YENİ)
-  ~ android/.../MainActivity.kt    processing state, MicButton mor geçiş
-  ~ android/.../Theme.kt           T.Wave rengi
-  + worker/src/lexicon.js          tüm kelime listeleri, tek kaynak (YENİ)
-  + worker/src/triage.js           regex kararsızsa modele ikili soru (YENİ)
-  ~ worker/src/router.js           UNSURE sınıfı, ek-duyarlı eşleşme
-  ~ worker/src/index.js            /lexicon, /classify uçları, triyaj
-  ~ android/.../HedgeDetector.kt   uzaktan sözlük indirme
-  + worker/test/router.test.mjs    88 test (YENİ)
-  + worker/test/triage.test.sh     deploy sonrası model testi (YENİ)
-  + KURULUM.md                     16 adımlık komut listesi (YENİ)
-
-KURULUM: KURULUM.md
-MİMARİ : README.md

@@ -1,4 +1,4 @@
-package com.vt.teyit
+package com.vt.mai
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
