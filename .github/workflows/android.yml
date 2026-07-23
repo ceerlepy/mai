@@ -32,7 +32,7 @@ jobs:
         run: |
           URL="${{ github.event.inputs.workerUrl }}"
           if [ -z "$URL" ]; then URL="${{ vars.WORKER_URL }}"; fi
-          if [ -z "$URL" ]; then URL="https://teyit-asistani.workers.dev"; fi
+          if [ -z "$URL" ]; then URL="https://mai-asistani.workers.dev"; fi
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "Kullanılan Worker: $URL"
 
@@ -43,18 +43,18 @@ jobs:
       - name: Yeniden adlandır
         run: |
           mkdir -p out
-          cp android/app/build/outputs/apk/release/*.apk out/teyit-${{ github.run_number }}.apk
+          cp android/app/build/outputs/apk/release/*.apk out/mai-${{ github.run_number }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: teyit-apk
+          name: mai-apk
           path: out/*.apk
 
       - name: Release yayınla
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.1.${{ github.run_number }}
-          name: Teyit v0.1.${{ github.run_number }}
+          name: MAI v0.1.${{ github.run_number }}
           body: |
             Telefondan indirip kur (Ayarlar → bilinmeyen kaynaklara izin ver).
             Worker: ${{ steps.cfg.outputs.url }}
